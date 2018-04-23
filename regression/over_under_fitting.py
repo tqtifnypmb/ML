@@ -6,7 +6,7 @@ import itertools
 
 # generate linear data with gaussian noise ~ N(e|0, 0)
 def generate_data():
-    data = datasets.make_regression(100, 10, coef=True)
+    data = datasets.make_regression(100, 100, coef=True)
     return data
 
 def feature_map(train_data_x, basis_function):
