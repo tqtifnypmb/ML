@@ -6,9 +6,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 def generate_data():
-    xs = np.linspace(0, 10, 100)
+    xs = np.linspace(0, 10, 1000)
     np.random.RandomState(0).shuffle(xs)
-    #xs = np.sort(xs[:20])
+    #xs = np.sort(xs)
     ys = np.sin(xs)
     x = xs[:,np.newaxis]
     y = ys[:, np.newaxis]
@@ -21,12 +21,12 @@ def fit_normal(train_x, train_y, degree):
     return regr
 
 def fit_lasso(train_x, train_y, degree):
-    regr = pipeline.make_pipeline(PolynomialFeatures(degree), linear_model.Lasso())
+    regr = pipeline.make_pipeline(PolynomialFeatures(degree), linear_model.LassoCV())
     regr.fit(train_x, train_y)
     return regr
 
 def fit_ridge(train_x, train_y, degree):
-    regr = pipeline.make_pipeline(PolynomialFeatures(degree), linear_model.Ridge())
+    regr = pipeline.make_pipeline(PolynomialFeatures(degree), linear_model.RidgeCV())
     regr.fit(train_x, train_y)
     return regr
 
@@ -44,7 +44,7 @@ def draw_figure(num, data_x, data_y, regression_func, title):
     plt.figure(num)
     plt.scatter(test_x, test_y, c='navy', label='testing points')
 
-    for c, degree in enumerate([3, 5, 10, 20]):
+    for c, degree in enumerate([1, 3, 5, 15]):
         model = regression_func(train_x, train_y, degree)
         predict_and_plot(model, test_x, "degree %d" % degree)
     
