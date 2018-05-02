@@ -1,7 +1,6 @@
 import numpy as np
-import matplotlib.pyplot as plt
 from sklearn import naive_bayes
-from sklearn import datasets
+from utility import group_features, test_model
 
 class GaussianNaiveBayes:
     def __init__(self, prior = None, var_smooth = 0.1):
@@ -12,14 +11,7 @@ class GaussianNaiveBayes:
     def fit(self, x, y):
         # collect samples belong to the same y
         self.class_ = np.unique(y)
-        class_idx = {}
-        idx = 0
-        for kls in y:
-            if kls in class_idx.keys():
-                class_idx[kls].append(idx)
-            else:
-                class_idx[kls] = [idx]
-            idx += 1
+        class_idx = group_features(x, y)
 
         # cal mean and variate for every features
         n_classes = len(self.class_)
@@ -54,36 +46,5 @@ class GaussianNaiveBayes:
         return np.argmax(likelihood, 0)
 
 
-class MultinormialNaiveBayes:
-    def __init__(self, alpha = 1.0):
-        # alpha for Laplace smooth
-        self.alpha_ = alpha
-
-    def fit(self, X, Y):
-        pass
-
-    def predict(self, X):
-        pass
-
-
 if __name__ == '__main__':
-    iris = datasets.load_iris()
-    
-    _, axs = plt.subplots(3, 1)
-
-    axs[0].plot(iris.target, label='Train data')
-    axs[0].legend(loc='lower right')
-
-    nb = naive_bayes.GaussianNB()
-    nb.fit(iris.data, iris.target)
-    y_pred = nb.predict(iris.data)
-    axs[1].plot(y_pred, label='GaussianNB')
-    axs[1].legend(loc='lower right')
-
-    custom_nb = GaussianNaiveBayes()
-    custom_nb.fit(iris.data, iris.target)
-    y_pred_2 = custom_nb.predict(iris.data)
-    axs[2].plot(y_pred_2, label='CustomNB')
-    axs[2].legend(loc='lower right')
-
-    plt.show()
+    test_model(naive_bayes.GaussianNB(), GaussianNaiveBayes())
