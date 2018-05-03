@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn import datasets
+from sklearn import model_selection
 
 def group_features(X, Y):
     """
@@ -26,19 +27,19 @@ def group_features(X, Y):
 
 def test_model(nb, custom_nb):
     iris = datasets.load_iris()
-    
+    train_x, test_x, train_y, test_y = model_selection.train_test_split(iris.data, iris.target, test_size=0.4)
     _, axs = plt.subplots(3, 1)
 
-    axs[0].plot(iris.target, label='Train data')
+    axs[0].plot(test_y, label='Test data')
     axs[0].legend(loc='lower right')
 
-    nb.fit(iris.data, iris.target)
-    y_pred = nb.predict(iris.data)
+    nb.fit(train_x, train_y)
+    y_pred = nb.predict(test_x)
     axs[1].plot(y_pred, label='SciKit model')
     axs[1].legend(loc='lower right')
 
-    custom_nb.fit(iris.data, iris.target)
-    y_pred_2 = custom_nb.predict(iris.data)
+    custom_nb.fit(train_x, train_y)
+    y_pred_2 = custom_nb.predict(test_x)
     axs[2].plot(y_pred_2, label='Custom model')
     axs[2].legend(loc='lower right')
 
