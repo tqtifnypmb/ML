@@ -1,4 +1,5 @@
 from sklearn import linear_model
+from sklearn import neural_network
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -39,3 +40,8 @@ if __name__ == '__main__':
     train_data_y = np.array([0, 1, 1, 0])
 
     regression(train_data_x, train_data_y)
+
+    mlp = neural_network.MLPRegressor()
+    mlp.fit(train_data_x, train_data_y)
+    y_pred = mlp.predict(train_data_x)
+    print(y_pred)
