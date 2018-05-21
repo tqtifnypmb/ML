@@ -66,13 +66,13 @@ def logistic_regress_model(x_train, y_train, x_test, y_test):
 
     cal_scores(y_pred, y_test, 'Logistic')
 
-def svm_model(train_data, test_data):
+def svm_model(x_train, y_train, x_test, y_test):
     model = svm.SVC()
     model.fit(x_train, y_train)
     y_pred = model.predict(x_test)
 
     cal_scores(y_pred, y_test, 'SVC')
-
+ 
 if __name__ == '__main__':
     train_data, test_data = load_data()
     
@@ -84,6 +84,4 @@ if __name__ == '__main__':
 
     naive_bayes_model(x_train, y_train, x_test, y_test)
     logistic_regress_model(x_train, y_train, x_test, y_test)
-
-    #extremely slow
-    #svm_model(train_data, test_data)
+    svm_model(x_train, y_train, x_test, y_test)
