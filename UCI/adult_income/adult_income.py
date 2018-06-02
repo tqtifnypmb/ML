@@ -72,7 +72,7 @@ def svm_model(x_train, y_train, x_test, y_test):
     y_pred = model.predict(x_test)
 
     cal_scores(y_pred, y_test, 'SVC')
- 
+    
 if __name__ == '__main__':
     train_data, test_data = load_data()
     
