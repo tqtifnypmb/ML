@@ -7,6 +7,7 @@ from sklearn import naive_bayes
 from sklearn import model_selection
 from sklearn import metrics
 from sklearn import linear_model
+from sklearn import svm
 
 COLUMN_NAMES = ['sex', 'length', 'diameter', 'height', 
                 'whole weight', 'shucked weight', 'viscera weight',
@@ -73,25 +74,49 @@ def logistics_regression(x_train, y_train, x_test, y_test):
     y_pred = model.predict(x_test)
     cal_metrics(y_test, y_pred, 'logisticsc regression')
 
-if __name__ == '__main__':
-    data = load_data()
+def select_features_by_stat_info(data):
     cal_features_mutual_info(data)
     cal_feature_variance(data)
     print('==================')
 
     # ignore features with low variance
-    selected_features = ['sex', 'length', 'whole weight', 
-                         'shucked weight', 'viscera weight',
-                         'shell weight']
+    return['sex', 'length', 'whole weight',               
+           'shucked weight', 'viscera weight',              
+           'shell weight']
 
+def select_feature_by_L1(data_train, data_test):
+    all_cols = ['sex', 'length', 'diameter', 'height', 
+                'whole weight', 'shucked weight', 'viscera weight',
+                'shell weight']
+    Y = data_train['rings']
+    X = data_train[all_cols]
+    X_test = data_test[all_cols]
+
+    svc = svm.LinearSVC(penalty='l1', dual=False).fit(X, Y)
+    model = fs.SelectFromModel(svc, threshold=0.5, prefit=True)
+    return (model.transform(X), model.transform(X_test))
+
+if __name__ == '__main__':
+    data = load_data()
+    
     split_point = math.floor(len(data) * 0.8) 
     data_train = data[: split_point]
     data_test = data[split_point:]
 
-    x_train = data_train[selected_features]
     y_train = data_train['rings']
-    x_test = data_test[selected_features]
     y_test = data_test['rings']
+
+    print('======== select features by stat info ========')
+    selected_features = select_features_by_stat_info(data)
+    x_train = data_train[selected_features]
+    x_test = data_test[selected_features]
+    
+    gaussian_naive_bayes(x_train, y_train, x_test, y_test)
+    logistics_regression(x_train, y_train, x_test, y_test)
+    multinomial_naive_bayes(x_train, y_train, x_test, y_test)
+
+    print('=========== select features by L1 =============')
+    x_train, x_test = select_feature_by_L1(data_train, data_test)
     gaussian_naive_bayes(x_train, y_train, x_test, y_test)
     logistics_regression(x_train, y_train, x_test, y_test)
     multinomial_naive_bayes(x_train, y_train, x_test, y_test)
