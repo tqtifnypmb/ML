@@ -34,3 +34,5 @@ recall score 反映模型发现数据中 positive 样本的能力。
 ---
 
 ### Imbalance multi-class problem
+
+某些类型的样本量太少导致基于 K-MEANS 的 oversampling 无法进行，需要进行 RandomOversampling。
