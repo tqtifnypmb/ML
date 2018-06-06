@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import math
+import matplotlib.pyplot as plt
 
 from sklearn import feature_selection as fs
 from sklearn import naive_bayes
@@ -8,6 +9,9 @@ from sklearn import model_selection
 from sklearn import metrics
 from sklearn import linear_model
 from sklearn import svm
+
+from imblearn.under_sampling import NeighbourhoodCleaningRule
+from imblearn.over_sampling import SMOTE, RandomOverSampler
 
 COLUMN_NAMES = ['sex', 'length', 'diameter', 'height', 
                 'whole weight', 'shucked weight', 'viscera weight',
@@ -35,6 +39,11 @@ def cal_feature_variance(data):
     for idx, col in enumerate(COLUMN_NAMES):
         print('{0} ==> {1}'.format(col, vt.variances_[idx]))
     
+def draw_class_hist(Y):
+    bins = [x for x in range(1, 29, 5)]
+    Y.plot.hist(bins=bins)
+    plt.show()
+
 # data loading / preprocessing
 
 def preprocessing(data):
@@ -44,7 +53,18 @@ def preprocessing(data):
 def load_data():
     data = pd.read_csv('../uci_data/abalone.data.txt', header=None, names=COLUMN_NAMES)
     preprocessing(data)
+    print(data.describe())
     return data
+
+def oversampling(X, Y):
+    X_resampled, Y_resampled = RandomOverSampler().fit_sample(X, Y)
+    X_resampled, Y_resampled = SMOTE().fit_sample(X_resampled, Y_resampled)
+    return (X_resampled, Y_resampled)
+
+def undersampling(X, Y):
+    rus = NeighbourhoodCleaningRule(ratio='majority')
+    x_new, y_new = rus.fit_sample(X, Y)
+    return (x_new, y_new)
 
 # metrics
 
@@ -53,9 +73,14 @@ def cal_metrics(y_test, y_pred, label):
     acc = metrics.accuracy_score(y_test, y_pred)
     print('{0} acc: {1}'.format(label, acc))
 
+    prec = metrics.precision_score(y_test, y_pred, average='weighted')
+    print('{0} precision: {1}'.format(label, prec))
+
+    recall = metrics.recall_score(y_test, y_pred, average='weighted')
+    print('{0} recall: {1}'.format(label, recall))
+
 # models
 
-# 1. imbalance multi-class labels
 def gaussian_naive_bayes(x_train, y_train, x_test, y_test):
     model = naive_bayes.GaussianNB()
     model.fit(x_train, y_train)
@@ -120,3 +145,17 @@ if __name__ == '__main__':
     gaussian_naive_bayes(x_train, y_train, x_test, y_test)
     logistics_regression(x_train, y_train, x_test, y_test)
     multinomial_naive_bayes(x_train, y_train, x_test, y_test)
+
+    print('============ under sampling ==============')
+    x_res, y_res = undersampling(x_train, y_train)
+    gaussian_naive_bayes(x_res, y_res, x_test, y_test)
+    logistics_regression(x_res, y_res, x_test, y_test)
+    multinomial_naive_bayes(x_res, y_res, x_test, y_test)
+
+    print('============ over sampling ==============')
+    x_res, y_res = oversampling(x_train, y_train)
+    gaussian_naive_bayes(x_res, y_res, x_test, y_test)
+    logistics_regression(x_res, y_res, x_test, y_test)
+    multinomial_naive_bayes(x_res, y_res, x_test, y_test)
+
+    #draw_class_hist(data['rings'])
