@@ -57,6 +57,8 @@ def load_data():
     return data
 
 def oversampling(X, Y):
+    # some class has only one sample
+    # to apply SMOTE we first oversample it randomly
     X_resampled, Y_resampled = RandomOverSampler().fit_sample(X, Y)
     X_resampled, Y_resampled = SMOTE().fit_sample(X_resampled, Y_resampled)
     return (X_resampled, Y_resampled)
