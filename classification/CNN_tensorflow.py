@@ -53,10 +53,10 @@ def model_fn(features, labels, mode):
 
 def main(unused_argv):
     mnist = input_data.read_data_sets('MNIST_data', one_hot=False)
-    train_data = mnist.train.images # Returns np.array
-    train_labels = np.asarray(mnist.train.labels, dtype=np.int32)
-    eval_data = mnist.test.images # Returns np.array
-    eval_labels = np.asarray(mnist.test.labels, dtype=np.int32)
+    train_data = mnist.train.images[:2000]
+    train_labels = np.asarray(mnist.train.labels, dtype=np.int32)[:2000]
+    eval_data = mnist.test.images[:500]
+    eval_labels = np.asarray(mnist.test.labels, dtype=np.int32)[:500]
 
     mnist_classifier = tf.estimator.Estimator(model_fn=model_fn, model_dir="./mnist_convnet_model")
 
@@ -67,9 +67,7 @@ def main(unused_argv):
         num_epochs=None,
         shuffle=True)
       
-    mnist_classifier.train(
-    input_fn=train_input_fn,
-    steps=20000)
+    mnist_classifier.train(input_fn=train_input_fn,steps=5000)
 
     eval_input_fn = tf.estimator.inputs.numpy_input_fn(
       x={"x": eval_data},
@@ -82,4 +80,4 @@ def main(unused_argv):
 
 
 if __name__ == '__main__':
-    tf.app.run()
+    tf.app.run(main=main)
