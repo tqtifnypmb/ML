@@ -5,6 +5,9 @@ from sklearn import cluster
 from sklearn import preprocessing
 from sklearn import feature_selection as fs
 from sklearn import model_selection as ms
+from sklearn import metrics
+from sklearn import naive_bayes
+from sklearn import neural_network
 
 DATA_PATH = '../uci_data/car.data.txt'
 COLUMN_NAMES = ['buying', 'maint', 'doors', 'persons', 
@@ -67,11 +70,43 @@ def feature_selection(data):
     cal_mutual_information(data)
     cal_variance(data)
 
+def cal_metrics(label, y_true, y_pred):
+    print('========== {0} ================'.format(label))
+    # cross_entropy = metrics.log_loss(y_true, y_pred)
+    # print('cross entropy %f' % cross_entropy)
+
+    acc = metrics.accuracy_score(y_true, y_pred)
+    print("acc {0}".format(acc))
+
+    prec = metrics.precision_score(y_true, y_pred, average='weighted')
+    print("precision {0}".format(prec))
+
+    recall = metrics.recall_score(y_true, y_pred, average='weighted')
+    print("recall {0}".format(recall))
+
 def k_means_model(x_train, y_train, x_test, y_test):
     model = cluster.KMeans()
     model.fit(x_train, y_train)
     
     y_pred = model.predict(x_test)
+    cal_metrics('KNN', y_test, y_pred)
+
+def gaussianNB_model(x_train, y_train, x_test, y_test):
+    model = naive_bayes.GaussianNB()
+    model.fit(x_train, y_train)
+
+    y_pred = model.predict(x_test)
+    cal_metrics('GaussianNB', y_test, y_pred)
+
+def multinomialNB_model(x_train, y_train, x_test, y_test):
+    model = naive_bayes.MultinomialNB()
+    model.fit(x_train, y_train)
+
+    y_pred = model.predict(x_test)
+    cal_metrics('MultinomialNB', y_test, y_pred)
+
+def mlp_model(x_train, y_train, x_test, y_test):
+    pass
 
 if __name__ == '__main__':
     data = load_data()
@@ -80,6 +115,8 @@ if __name__ == '__main__':
 
     Y = data['value']
     X = data.loc[:, data.columns != 'value']
-    x_train, x_test, y_train, y_test = ms.train_test_split(X, Y, 0.3)
+    x_train, x_test, y_train, y_test = ms.train_test_split(X, Y,  test_size=0.3)
     k_means_model(x_train, y_train, x_test, y_test)
-    
+    gaussianNB_model(x_train, y_train, x_test, y_test)
+    multinomialNB_model(x_train, y_train, x_test, y_test)
+    mlp_model(x_train, y_train, x_test, y_test)
