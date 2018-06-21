@@ -106,7 +106,11 @@ def multinomialNB_model(x_train, y_train, x_test, y_test):
     cal_metrics('MultinomialNB', y_test, y_pred)
 
 def mlp_model(x_train, y_train, x_test, y_test):
-    pass
+    mlp = neural_network.MLPClassifier(hidden_layer_sizes=(10000,))
+    mlp.fit(x_train, y_train)
+
+    y_pred = mlp.predict(x_test)
+    cal_metrics('MLP', y_test, y_pred)
 
 if __name__ == '__main__':
     data = load_data()
