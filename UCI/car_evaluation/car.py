@@ -8,6 +8,7 @@ from sklearn import model_selection as ms
 from sklearn import metrics
 from sklearn import naive_bayes
 from sklearn import neural_network
+from sklearn import linear_model
 
 DATA_PATH = '../uci_data/car.data.txt'
 COLUMN_NAMES = ['buying', 'maint', 'doors', 'persons', 
@@ -106,11 +107,39 @@ def multinomialNB_model(x_train, y_train, x_test, y_test):
     cal_metrics('MultinomialNB', y_test, y_pred)
 
 def mlp_model(x_train, y_train, x_test, y_test):
-    mlp = neural_network.MLPClassifier(hidden_layer_sizes=(10000,))
-    mlp.fit(x_train, y_train)
+    mlp = neural_network.MLPClassifier(hidden_layer_sizes=(50,))
+    mlp_cv = ms.RandomizedSearchCV(mlp, param_distributions = {'hidden_layer_sizes': [(5,), (6,), (7,), (10,), (20,), (30,), (50,), (100,), (200,), (500,)]})
+    mlp_cv.fit(x_train, y_train)
+    report(mlp_cv.cv_results_)
 
+    mlp.fit(x_train, y_train)
     y_pred = mlp.predict(x_test)
     cal_metrics('MLP', y_test, y_pred)
+
+def logistic_model(x_train, y_train, x_test, y_test):
+    lm = linear_model.LogisticRegression()
+    lm.fit(x_train, y_train)
+
+    y_pred = lm.predict(x_test)
+    cal_metrics('Logistics', y_test, y_pred)
+
+def logistics_cv_model(x_train, y_train, x_test, y_test):
+    lm = linear_model.LogisticRegressionCV()
+    lm.fit(x_train, y_train)
+
+    y_pred = lm.predict(x_test)
+    cal_metrics('Logistics CV', y_test, y_pred)
+
+def report(results, n_top=3):
+    for i in range(1, n_top + 1):
+        candidates = np.flatnonzero(results['rank_test_score'] == i)
+        for candidate in candidates:
+            print("Model with rank: {0}".format(i))
+            print("Mean validation score: {0:.3f} (std: {1:.3f})".format(
+                  results['mean_test_score'][candidate],
+                  results['std_test_score'][candidate]))
+            print("Parameters: {0}".format(results['params'][candidate]))
+            print("")
 
 if __name__ == '__main__':
     data = load_data()
@@ -124,3 +153,5 @@ if __name__ == '__main__':
     gaussianNB_model(x_train, y_train, x_test, y_test)
     multinomialNB_model(x_train, y_train, x_test, y_test)
     mlp_model(x_train, y_train, x_test, y_test)
+    logistic_model(x_train, y_train, x_test, y_test)
+    logistics_cv_model(x_train, y_train, x_test, y_test)
