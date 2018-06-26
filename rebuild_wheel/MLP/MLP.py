@@ -30,8 +30,13 @@ class MLP:
     def _backward(self, pred, label):
         n_units = self.hidden_layer_sizes_[0]
         phis = np.zeros((n_units, 1))
-        phi_0 = label - pred
-        
+        phi_0 = (pred - label) * pred * (1 - pred)
+
+        # phis for first hidden layer
+        for i in range(n_units):
+            oi = self.hidden_values[i][0]
+            gradient = oi * phi_0
+            phis[i] = self.output_weights[i][0] * phi_0 * oi * (1 - oi)
 
     def _is_convergent(self, output, y):
         return False
@@ -91,4 +96,4 @@ if __name__ == '__main__':
     mlp.fit(x, y)
 
     y_pred = mlp.predict(x)
-    # cal_metrics(y, y_pred)
+    cal_metrics(y, y_pred)
