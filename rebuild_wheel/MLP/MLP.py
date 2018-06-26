@@ -3,10 +3,13 @@ import time
 
 from math import exp
 from sklearn import metrics
+from random import randint
 
+# Condider single hidden layer only 
+# bias are ignored
 class MLP:
-    def __init__(self, hidden_layer_sizes, learning_rate = 0.001):
-        self.hidden_layer_sizes_ = hidden_layer_sizes
+    def __init__(self, hidden_neuron_num, learning_rate = 0.01):
+        self.hidden_neuron_num_ = hidden_neuron_num
         self.rd = np.random.RandomState(seed=123456)
         self.learning_rate_ = learning_rate
 
@@ -17,65 +20,78 @@ class MLP:
         return exp(x) / (1 + exp(x))
 
     def _forward(self, features):
-        n_units = self.hidden_layer_sizes_[0]
-        
-        for i in range(n_units):
-            w = self.weights[i]
-            self.hidden_values[i] =  self._relu(np.matmul(features, w))
+        # input layer --> hidden layer
+        for i in range(self.hidden_neuron_num_):
+            self.hidden_values[i] = self._relu(np.matmul(features, self.input_weight))
 
-        output_value = np.matmul(np.transpose(self.output_weights), self.hidden_values)
-
+        # hidden layer --> output layer
+        output_value = np.matmul(np.transpose(self.hidden_weight), self.hidden_values)
         return self._sigmoid(output_value[0][0])
 
-    def _backward(self, pred, label):
-        n_units = self.hidden_layer_sizes_[0]
-        phis = np.zeros((n_units, 1))
-        phi_0 = (pred - label) * pred * (1 - pred)
+    def _backward(self, features, pred, label):
+        # output layer --> hidden layer
+        output_phi = (pred - label) * pred * (1.0 - pred)
+        hidden_phis = np.zeros((self.hidden_neuron_num_, 1))
 
-        # phis for first hidden layer
-        for i in range(n_units):
-            oi = self.hidden_values[i][0]
-            gradient = oi * phi_0
-            phis[i] = self.output_weights[i][0] * phi_0 * oi * (1 - oi)
+        for i in range(self.hidden_neuron_num_):
+            oi = self.hidden_values[i]
+            hidden_phis[i] = self.hidden_weight[i] * output_phi * oi * (1.0 - oi)
+            gradient = output_phi * oi
+            self.hidden_weight[i] -= self.learning_rate_ * gradient
 
+        # hidden layer --> input layer
+        n_features = self.samples.shape[1]
+        for i in range(n_features):
+            oi = features[i]
+            gradient = 0
+            for j in range(self.hidden_neuron_num_):
+                gradient += oi * hidden_phis[j]
+
+            self.input_weight[i] -= gradient * self.learning_rate_
+        
     def _is_convergent(self, output, y):
-        return False
+        diff = abs(output - y)
+        return diff < 0.01
 
     def _train(self):
         n_sample = self.samples.shape[0]
 
-        for epoch in range(n_sample):
+        while True:
+            epoch = randint(0, n_sample - 1)
+    
             features = self.samples[epoch]
-            label = self.labels[epoch]
+            label = self.labels[epoch][0]
 
             pred = self._forward(features)
-            
+
             if self._is_convergent(pred, label):
                 break
 
-            self._backward(pred, label)
+            self._backward(features, pred, label)
 
     def fit(self, x, y):
         if x.shape[0] != y.shape[0]:
             raise ValueError('the dimension of x is not compatible with y')
 
-        n_samples = x.shape[0]
         n_features = x.shape[1]
-        n_units = self.hidden_layer_sizes_[0]
+        n_units = self.hidden_neuron_num_
 
-        one = np.ones((n_samples, 1))
-        self.samples = np.hstack((x, one))
+        self.samples = x
         self.labels = y
 
-        self.weights = self.rd.rand(n_units, n_features + 1)
-
-        self.hidden_values = np.zeros((n_units + 1, 1))
-        self.output_weights = self.rd.rand(n_units + 1, 1)
+        self.input_weight = self.rd.rand(n_features, 1)
+        self.hidden_weight = self.rd.rand(n_units, 1)
+        self.hidden_values = np.zeros((n_units, 1))
 
         self._train()
 
     def predict(self, x):
-        pass
+        n_smaples = x.shape[0]
+        labels = np.zeros((n_smaples, 1))
+        for i in range(n_smaples):
+            labels[i] = self._forward(x[i])
+        
+        return labels
 
 
 def cal_metrics(y_true, y_pred):
@@ -89,11 +105,11 @@ def cal_metrics(y_true, y_pred):
     print("recall {0}".format(recall))
 
 if __name__ == '__main__':
-    mlp = MLP((3,1))
+    mlp = MLP(3)
 
     x = np.arange(0, 100).reshape((10, -1))
     y = np.arange(0,10).reshape(10, -1)
     mlp.fit(x, y)
 
     y_pred = mlp.predict(x)
-    cal_metrics(y, y_pred)
+    # cal_metrics(y, y_pred)
