@@ -8,24 +8,30 @@ from random import randint
 # Condider single hidden layer only 
 # bias are ignored
 class MLP:
-    def __init__(self, hidden_neuron_num, learning_rate = 0.01):
+    def __init__(self, hidden_neuron_num, learning_rate = 0.001):
         self.hidden_neuron_num_ = hidden_neuron_num
         self.rd = np.random.RandomState(seed=123456)
         self.learning_rate_ = learning_rate
+        self.round_ = 10000
+        self.cur_round_ = 0
 
     def _relu(self, x):
         return max(0, x)
 
     def _sigmoid(self, x):
-        return exp(x) / (1 + exp(x))
+        if x < 0:
+            return 1 - 1/(1 + exp(x))
+        else:
+            return 1/(1 + exp(-x))
 
     def _forward(self, features):
         # input layer --> hidden layer
         for i in range(self.hidden_neuron_num_):
-            self.hidden_values[i] = self._relu(np.matmul(features, self.input_weight))
+            self.hidden_values[i] = self._relu(np.matmul(np.transpose(features), self.input_weight[i]))
 
         # hidden layer --> output layer
         output_value = np.matmul(np.transpose(self.hidden_weight), self.hidden_values)
+        
         return self._sigmoid(output_value[0][0])
 
     def _backward(self, features, pred, label):
@@ -41,17 +47,19 @@ class MLP:
 
         # hidden layer --> input layer
         n_features = self.samples.shape[1]
-        for i in range(n_features):
-            oi = features[i]
+        for i in range(self.hidden_neuron_num_):
             gradient = 0
-            for j in range(self.hidden_neuron_num_):
-                gradient += oi * hidden_phis[j]
-
-            self.input_weight[i] -= gradient * self.learning_rate_
+            for j in range(n_features):
+                oi = features[j]
+                gradient += oi * hidden_phis[i]
+                self.input_weight[i][j] -= gradient * self.learning_rate_
         
     def _is_convergent(self, output, y):
-        diff = abs(output - y)
-        return diff < 0.01
+        if self.cur_round_ > self.round_:
+            return True
+        else:
+            self.cur_round_ += 1
+            return False
 
     def _train(self):
         n_sample = self.samples.shape[0]
@@ -63,7 +71,7 @@ class MLP:
             label = self.labels[epoch][0]
 
             pred = self._forward(features)
-
+            
             if self._is_convergent(pred, label):
                 break
 
@@ -79,7 +87,7 @@ class MLP:
         self.samples = x
         self.labels = y
 
-        self.input_weight = self.rd.rand(n_features, 1)
+        self.input_weight = self.rd.rand(n_units, n_features)
         self.hidden_weight = self.rd.rand(n_units, 1)
         self.hidden_values = np.zeros((n_units, 1))
 
