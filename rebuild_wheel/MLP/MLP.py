@@ -21,7 +21,6 @@ class MLP:
     def _softmax(self, x):
         e_x = np.exp(x - np.max(x))
         return e_x / e_x.sum()
-        # return np.exp(x) / np.sum(np.exp(x))
 
     def _sigmoid(self, x):
         if x < 0:
@@ -41,7 +40,7 @@ class MLP:
         
         return self._softmax(self.output_value)
 
-    def _backward(self, features, pred, label):
+    def _backward(self, epoch, features, pred, label):
         # output layer --> hidden layer
         n_labels = self.labels.shape[0]
         output_phis = np.zeros((n_labels, 1))
@@ -51,20 +50,21 @@ class MLP:
             p = 1 if label == i else 0
             output_phis[i] = (pred[i] - p) * pred[i] * (1.0 - pred[i])
 
+        total_output_phi = np.sum(output_phis)
+        for i in range(n_labels):
             for j in range(self.hidden_neuron_num_):
                 oi = self.hidden_values[j]
-                hidden_phis[j] = self.hidden_weight[i][j] * output_phis[i] * oi * (1.0 - oi)
+                hidden_phis[j] = self.hidden_weight[i][j] * total_output_phi * oi * (1.0 - oi)
                 gradient = output_phis[i] * oi
                 self.hidden_weight[i][j] -= self.learning_rate_ * gradient
         
         # hidden layer --> input layer
         n_features = self.samples.shape[1]
-        for i in range(self.hidden_neuron_num_):
-            gradient = 0
-            for j in range(n_features):
-                oi = features[j]
-                gradient += oi * hidden_phis[i]
-                self.input_weight[i][j] -= gradient * self.learning_rate_
+        for i in range(n_features):
+            oi = features[i]
+            for j in range(self.hidden_neuron_num_):
+                gradient = oi * hidden_phis[j]
+                self.input_weight[j][i] -= gradient * self.learning_rate_
         
     def _is_convergent(self, output, y):
         if self.cur_round_ > self.round_:
@@ -87,7 +87,7 @@ class MLP:
             if self._is_convergent(pred, label):
                 break
 
-            self._backward(features, pred, label)
+            self._backward(epoch, features, pred, label)
 
     def fit(self, x, y):
         if x.shape[0] != y.shape[0]:
@@ -139,7 +139,5 @@ if __name__ == '__main__':
 
     y_pred = mlp.predict(x)
     
-    print(y_pred)
-    print(y)
     # print(np.argmax(y_pred))
     # cal_metrics(y, y_pred)
