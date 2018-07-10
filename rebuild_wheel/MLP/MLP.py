@@ -10,9 +10,8 @@ from random import randint
 class MLP:
     def __init__(self, hidden_neuron_num, learning_rate = 0.01):
         self.hidden_neuron_num_ = hidden_neuron_num
-        self.rd = np.random.RandomState(seed=123456)
         self.learning_rate_ = learning_rate
-        self.round_ = 200
+        self.round_ = 500
         self.cur_round_ = 0
 
     def _relu(self, x):
@@ -28,43 +27,46 @@ class MLP:
         else:
             return 1/(1 + exp(-x))
 
-    def _forward(self, features):
+    def _forward(self, input):
+        features = input.reshape(1, -1)
+
         # input layer --> hidden layer
         for i in range(self.hidden_neuron_num_):
-            self.hidden_values[i] = self._relu(np.matmul(np.transpose(features), self.input_weight[i]))
+            z = np.matmul(features, self.input_weight[i].T)
+            self.hidden_values[i] = self._sigmoid(z)
+
+            for j in range(features.shape[1]):
+                x = features[0][j]
+                self.gradients[i][j] = self._sigmoid(x) * (1 - self._sigmoid(x))
 
         # hidden layer --> output layer
         n_labels = self.labels.shape[0]
         for i in range(n_labels):
-            self.output_value[i] = np.matmul(np.transpose(self.hidden_weight[i]), self.hidden_values)
+            z = np.matmul(self.hidden_values.reshape(1, -1), self.hidden_weight[i].reshape(1, -1).T)
+            self.output_value[i] = z
         
         return self._softmax(self.output_value)
 
-    def _backward(self, epoch, features, pred, label):
+    def _backward(self, epoch, input, pred, label):
+        features = input.reshape(1, -1)
+
         # output layer --> hidden layer
         n_labels = self.labels.shape[0]
-        output_phis = np.zeros((n_labels, 1))
-        hidden_phis = np.zeros((self.hidden_neuron_num_, 1))
+        n_features = features.shape[1]
+        hidden_gradients = np.zeros((n_labels, 1))
 
         for i in range(n_labels):
             p = 1 if label == i else 0
-            output_phis[i] = (pred[i] - p) * pred[i] * (1.0 - pred[i])
+            hidden_gradients[i] = pred[i] - p
 
-        total_output_phi = np.sum(output_phis)
-        for i in range(n_labels):
-            for j in range(self.hidden_neuron_num_):
-                oi = self.hidden_values[j]
-                hidden_phis[j] = self.hidden_weight[i][j] * total_output_phi * oi * (1.0 - oi)
-                gradient = output_phis[i] * oi
-                self.hidden_weight[i][j] -= self.learning_rate_ * gradient
-        
+        total_hidden_gradient = np.sum(hidden_gradients)
+        self.hidden_weight -= total_hidden_gradient * self.learning_rate_
+
         # hidden layer --> input layer
-        n_features = self.samples.shape[1]
-        for i in range(n_features):
-            oi = features[i]
-            for j in range(self.hidden_neuron_num_):
-                gradient = oi * hidden_phis[j]
-                self.input_weight[j][i] -= gradient * self.learning_rate_
+        for i in range(self.hidden_neuron_num_):
+            for j in range(n_features):
+                gradient = self.gradients[i][j] * total_hidden_gradient
+                self.input_weight[i][j] -= gradient * self.learning_rate_
         
     def _is_convergent(self, output, y):
         if self.cur_round_ > self.round_:
@@ -100,9 +102,10 @@ class MLP:
         self.samples = x
         self.labels = y
 
-        self.input_weight = self.rd.rand(n_units, n_features)
-        self.hidden_weight = self.rd.rand(n_labels, n_units)
-       
+        self.input_weight = np.random.randn(n_units, n_features)
+        self.hidden_weight = np.random.randn(n_labels, n_units)
+        
+        self.gradients = np.zeros((n_units, n_features))
         self.output_value = np.zeros((n_labels, 1))
         self.hidden_values = np.zeros((n_units, 1))
 
@@ -139,5 +142,6 @@ if __name__ == '__main__':
 
     y_pred = mlp.predict(x)
     
-    # print(np.argmax(y_pred))
+    print(y_pred)
+    print(np.argmax(y_pred))
     # cal_metrics(y, y_pred)
