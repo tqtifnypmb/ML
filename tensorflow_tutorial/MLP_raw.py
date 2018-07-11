@@ -13,19 +13,36 @@ class MLP:
 
         input = tf.placeholder(tf.float32, shape=(n_sample, n_feature))
         output = tf.placeholder(tf.float32, shape=(n_sample, n_feature))
-        w1 = tf.Variable(tf.random_normal((n_feature, n_hidden)))
-        w2 = tf.Variable(tf.random_normal((n_hidden, n_feature)))
 
-        hidden = tf.maximum(tf.matmul(input, w1), 0)
-        y_pred = tf.matmul(hidden, w2)
+        # init weight randomly, which usually bring bad performance
+        # w1 = tf.Variable(tf.random_normal((n_feature, n_hidden)))
+        # w2 = tf.Variable(tf.random_normal((n_hidden, n_feature)))
 
-        diff = y_pred - y
-        loss = tf.reduce_mean(tf.reduce_sum(diff ** 2, axis=1))
-        grad_w1, grad_w2 = tf.gradients(loss, [w1, w2])
+        # hidden = tf.maximum(tf.matmul(input, w1), 0)
+        # y_pred = tf.matmul(hidden, w2)
 
-        new_w1 = w1.assign(w1 - self.learning_rate_ * grad_w1)
-        new_w2 = w2.assign(w2 - self.learning_rate_ * grad_w2)
-        update = tf.group(new_w1, new_w2)
+        # init weight using tensorflow
+        init = tf.contrib.layers.xavier_initializer()
+        hidden = tf.layers.dense(inputs=input, 
+                                 units=n_hidden, 
+                                 activation=tf.nn.relu,
+                                 kernel_initializer=init)
+        y_pred = tf.layers.dense(inputs=hidden, units=n_feature, kernel_initializer=init)
+
+        # optimize manually
+        # diff = y_pred - y
+        # loss = tf.reduce_mean(tf.reduce_sum(diff ** 2, axis=1))
+        
+        # grad_w1, grad_w2 = tf.gradients(loss, [w1, w2])
+        # new_w1 = w1.assign(w1 - self.learning_rate_ * grad_w1)
+        # new_w2 = w2.assign(w2 - self.learning_rate_ * grad_w2)
+        # update = tf.group(new_w1, new_w2)
+
+        # optimize by tensorflow
+        loss = tf.losses.mean_squared_error(y, y_pred)
+
+        optimizer = tf.train.GradientDescentOptimizer(self.learning_rate_)
+        update = optimizer.minimize(loss)
 
         with tf.Session() as sess:
             sess.run(tf.global_variables_initializer())
