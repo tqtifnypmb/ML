@@ -49,11 +49,9 @@ class MLP:
             values = {input: X,
                       output: y}
             
-            losses = []
-            for t in range(5000):
+            for _ in range(5000):
                 loss_val, _ = sess.run([loss, update], feed_dict=values)
                 print(loss_val)
-        
 
     def predict(self, X):
         pass
