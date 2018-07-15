@@ -15,6 +15,7 @@ class MLP:
         self.tolerent_ = tolerent
         self.gradient_type_ = gradient_type
         self.relu_ = relu
+        self.last_loss_value_ = 0
 
     def _init_weights(self, hidden_shape, output_shape):
         w1 = tf.random_normal(hidden_shape)
@@ -93,7 +94,12 @@ class MLP:
             raise ValueError("Not supported relu type")
 
     def _is_convergent(self, loss):
-        return loss < self.tolerent_
+        if (abs(loss - self.last_loss_value_) < self.tolerent_) {
+            return True
+        } else {
+            self.last_loss_value_ = loss
+            return False
+        }
 
     def _optimize(self, samples, labels):
         n_hidden = max(samples.shape[1] / 3, 5)
