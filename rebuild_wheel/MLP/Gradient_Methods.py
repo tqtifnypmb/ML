@@ -8,11 +8,13 @@ from sklearn import preprocessing
 from math import floor
 
 class MLP:
-    def __init__(self, learning_rate, batch_size = 100, max_iteration = 10000, tolerent = 1e-2):
+    def __init__(self, learning_rate, gradient_type, relu = None, batch_size = 100, max_iteration = 100000, tolerent = 1e-2):
         self.learning_rate_ = learning_rate
         self.batch_size_ = batch_size
         self.max_iteration_ = max_iteration
         self.tolerent_ = tolerent
+        self.gradient_type_ = gradient_type
+        self.relu_ = relu
 
     def _init_weights(self, hidden_shape, output_shape):
         w1 = tf.random_normal(hidden_shape)
@@ -28,29 +30,77 @@ class MLP:
 
     def _vanilia_gradient_descent(self, loss, w1, w2):
         grad_w1, grad_w2 = tf.gradients(loss, [w1, w2])
-        new_w1 = w1 - grad_w1 * self.learning_rate_
-        new_w2 = w2 - grad_w2 * self.learning_rate_
+        new_w1 = w1.assign(w1 - grad_w1 * self.learning_rate_)
+        new_w2 = w2.assign(w2 - grad_w2 * self.learning_rate_)
 
         return loss, tf.group(new_w1, new_w2)
+
+    def _momentum_gradient_descent(self, loss, w1, w2):
+        grad_w1, grad_w2 = tf.gradients(loss, [w1, w2])
+
+        vel_1_shape = (self.n_features_, self.neuron_num_)
+        vel_2_shape = (self.neuron_num_, self.n_labels_dim_)
+
+        velocity1 = tf.Variable(tf.zeros(vel_1_shape))
+        velocity2 = tf.Variable(tf.zeros(vel_2_shape))
+
+        velocity1 = velocity1.assign(0.95 * velocity1 + grad_w1 * self.learning_rate_)
+        velocity2 = velocity2.assign(0.95 * velocity2 + grad_w2 * self.learning_rate_)
+        new_w1 = w1.assign(w1 - velocity1)
+        new_w2 = w2.assign(w2 - velocity2)
+        return loss, tf.group(new_w1, new_w2)
+
+    def _nesterov_gradient_descent(self, loss, w1, w2):
+        vel_1_shape = (self.n_features_, self.neuron_num_)
+        vel_2_shape = (self.neuron_num_, self.n_labels_dim_)
+        velocity1 = tf.Variable(tf.zeros(vel_1_shape))
+        velocity2 = tf.Variable(tf.zeros(vel_2_shape))
+
+        gama = 0.9
+
+        future_1 = tf.Variable(w1)
+        future_2 = tf.Variable(w2)
+        new_future_1 = future_1.assign(future_1 - gama * velocity1)
+        new_future_2 = future_2.assign(future_2 - gama * velocity2)
+        grad_w1, grad_w2 = tf.gradients(loss, [future_1, future_2])
+        velocity1 = velocity1.assign(gama * velocity1 + grad_w1 * self.learning_rate_)
+        velocity2 = velocity2.assign(gama * velocity2 + grad_w2 * self.learning_rate_)
+        new_w1 = w1.assign(w1 - velocity1)
+        new_w2 = w2.assign(w2 - velocity2)
+        return loss, tf.group(new_w1, new_w2, new_future_1, new_future_2)
 
     def _handcraft_optimizer(self, y_pred, y, w1, w2):
         diff = y_pred - y
         loss = tf.reduce_mean(tf.reduce_sum(diff ** 2, axis=1))
-        return self._vanilia_gradient_descent(loss, w1, w2)
+
+        if self.gradient_type_ == 'vanilia':
+            return self._vanilia_gradient_descent(loss, w1, w2)
+        elif self.gradient_type_ == 'momentum':
+            return self._momentum_gradient_descent(loss, w1, w2) 
+        elif self.gradient_type_ == 'nesterov':
+            return self._nesterov_gradient_descent(loss, w1, w2)
+        else:
+            raise ValueError('Not support gradient type')
 
     def _relu(self, input, hidden_weight):
-        # relu
-        # return tf.maximum(tf.matmul(input, hidden_weight), 0)
+        if self.relu_ is None:
+            return tf.maximum(tf.matmul(input, hidden_weight), 0)
+        elif self.relu_ == 'leaky':
+            x = tf.matmul(input, hidden_weight)
+            hidden = tf.maximum(x, tf.scalar_mul(0.01, x))
+            return hidden
+        else:
+            raise ValueError("Not supported relu type")
 
-        # leaky 
-        x = tf.matmul(input, hidden_weight)
-        hidden = tf.maximum(x, tf.scalar_mul(0.01, x))
-        return hidden
+    def _is_convergent(self, loss):
+        return loss < self.tolerent_
 
-    def _optimize(self, samples, labels, handcraft_optimizer=False):
+    def _optimize(self, samples, labels):
         n_hidden = max(samples.shape[1] / 3, 5)
         n_hidden = int(floor(n_hidden))
-
+        self.neuron_num_ = n_hidden
+        self.n_features_ = samples.shape[1]
+        self.n_labels_dim_ = labels.shape[1]
         w1, w2 = self._init_weights((samples.shape[1], n_hidden), (n_hidden, labels.shape[1]))
 
         x = tf.placeholder(tf.float32, shape=(self.batch_size_, samples.shape[1]), name="X")
@@ -67,7 +117,7 @@ class MLP:
         y_pred = tf.matmul(hidden, y)
 
         loss, optimize_action = None, None
-        if handcraft_optimizer:
+        if self.gradient_type_ is not None:
             loss, optimize_action = self._handcraft_optimizer(y_pred, label, h, y)
         else:
             loss, optimize_action = self._predifined_optimizer(y_pred, label)
@@ -80,9 +130,10 @@ class MLP:
         n_batch = int(floor(n_batch))
         for _ in range(self.max_iteration_):
             # batch stochastic gradient descent
+            np.random.shuffle(data)
+            batch_idx = 0
             for _ in range(n_batch):
-                np.random.shuffle(data)
-                batch_data = data[:self.batch_size_]
+                batch_data = data[self.batch_size_ * batch_idx: self.batch_size_ * (batch_idx + 1)]
                 batch_samples = batch_data[:,:samples.shape[1]]
                 batch_labels = batch_data[:,samples.shape[1]:]
 
@@ -92,7 +143,7 @@ class MLP:
                 }
                 loss_value, _ = self.sess_.run([loss, optimize_action], feed_dict=values)
                 print(loss_value)
-                if loss_value < self.tolerent_:
+                if self._is_convergent(loss_value):
                     return
 
         print("Failed to converge")
@@ -106,7 +157,7 @@ class MLP:
 
     def predict(self, X):
         input = tf.placeholder(tf.float32, X.shape)
-        hidden = tf.maximum(tf.matmul(input, self.hidden_weight_), 0)
+        hidden = self._relu(input, self.hidden_weight_)
         y_pred = tf.matmul(hidden, self.output_weight_)
 
         value = {
@@ -131,7 +182,7 @@ if __name__ == '__main__':
 
     encoded_y = preprocessing.OneHotEncoder().fit_transform(y).toarray()
     # print(encoded_y)
-    mlp = MLP(1e-2, batch_size=90, tolerent=1e-2)
+    mlp = MLP(1e-2, None, relu='leaky', batch_size=80, tolerent=1e-2)
     mlp.fit(X, encoded_y)
 
     y_pred = mlp.predict(X)
