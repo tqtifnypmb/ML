@@ -15,7 +15,9 @@ class MLP:
         self.tolerent_ = tolerent
         self.gradient_type_ = gradient_type
         self.relu_ = relu
-        self.last_loss_value_ = 0
+        self.best_loss_value_ = 1000000.
+        self.no_improvement_num_ = 0
+        self.max_no_improvement_num_ = 500
 
     def _init_weights(self, hidden_shape, output_shape):
         w1 = tf.random_normal(hidden_shape)
@@ -45,8 +47,10 @@ class MLP:
         velocity1 = tf.Variable(tf.zeros(vel_1_shape))
         velocity2 = tf.Variable(tf.zeros(vel_2_shape))
 
-        velocity1 = velocity1.assign(0.95 * velocity1 + grad_w1 * self.learning_rate_)
-        velocity2 = velocity2.assign(0.95 * velocity2 + grad_w2 * self.learning_rate_)
+        gama = 0.9
+
+        velocity1 = velocity1.assign(gama * velocity1 + grad_w1 * self.learning_rate_)
+        velocity2 = velocity2.assign(gama * velocity2 + grad_w2 * self.learning_rate_)
         new_w1 = w1.assign(w1 - velocity1)
         new_w2 = w2.assign(w2 - velocity2)
         return loss, tf.group(new_w1, new_w2)
@@ -68,7 +72,7 @@ class MLP:
         velocity2 = velocity2.assign(gama * velocity2 + grad_w2 * self.learning_rate_)
         new_w1 = w1.assign(w1 - velocity1)
         new_w2 = w2.assign(w2 - velocity2)
-        return loss, tf.group(new_w1, new_w2, new_future_1, new_future_2)
+        return loss, tf.group(new_future_1, new_future_2, new_w1, new_w2)
 
     def _handcraft_optimizer(self, y_pred, y, w1, w2):
         diff = y_pred - y
@@ -94,12 +98,15 @@ class MLP:
             raise ValueError("Not supported relu type")
 
     def _is_convergent(self, loss):
-        if (abs(loss - self.last_loss_value_) < self.tolerent_) {
-            return True
-        } else {
-            self.last_loss_value_ = loss
-            return False
-        }
+        if loss > self.best_loss_value_ - self.tolerent_:
+            self.no_improvement_num_ += 1
+        else:
+            self.no_improvement_num_ = 0
+
+        if loss < self.best_loss_value_:
+            self.best_loss_value_ = loss
+        
+        return self.no_improvement_num_ >= self.max_no_improvement_num_
 
     def _optimize(self, samples, labels):
         n_hidden = max(samples.shape[1] / 3, 5)
@@ -188,7 +195,7 @@ if __name__ == '__main__':
 
     encoded_y = preprocessing.OneHotEncoder().fit_transform(y).toarray()
     # print(encoded_y)
-    mlp = MLP(1e-2, None, relu='leaky', batch_size=80, tolerent=1e-2)
+    mlp = MLP(1e-3, 'vanilia', relu='leaky', batch_size=80, tolerent=1e-5)
     mlp.fit(X, encoded_y)
 
     y_pred = mlp.predict(X)
