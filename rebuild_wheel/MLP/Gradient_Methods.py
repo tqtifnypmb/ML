@@ -33,8 +33,8 @@ class MLP:
 
     def _vanilia_gradient_descent(self, loss, w1, w2):
         grad_w1, grad_w2 = tf.gradients(loss, [w1, w2])
-        new_w1 = w1.assign(w1 - grad_w1 * self.learning_rate_)
-        new_w2 = w2.assign(w2 - grad_w2 * self.learning_rate_)
+        new_w1 = w1.assign(w1 - grad_w1 / self.batch_size_ * self.learning_rate_)
+        new_w2 = w2.assign(w2 - grad_w2 / self.batch_size_ * self.learning_rate_)
 
         return loss, tf.group(new_w1, new_w2)
 
@@ -49,8 +49,8 @@ class MLP:
 
         gama = 0.9
 
-        velocity1 = velocity1.assign(gama * velocity1 + grad_w1 * self.learning_rate_)
-        velocity2 = velocity2.assign(gama * velocity2 + grad_w2 * self.learning_rate_)
+        velocity1 = velocity1.assign(gama * velocity1 + grad_w1 / self.batch_size_ * self.learning_rate_)
+        velocity2 = velocity2.assign(gama * velocity2 + grad_w2 / self.batch_size_ * self.learning_rate_)
         new_w1 = w1.assign(w1 - velocity1)
         new_w2 = w2.assign(w2 - velocity2)
         return loss, tf.group(new_w1, new_w2)
@@ -108,6 +108,14 @@ class MLP:
         
         return self.no_improvement_num_ >= self.max_no_improvement_num_
 
+    def _batch_normalization(self, hidden):
+        return hidden
+        
+        mean = tf.reduce_mean(hidden, axis=0)
+        vars = tf.reduce_mean((hidden - mean) ** 2, axis=0)
+        eselon = 1e-8
+        return hidden - mean / tf.sqrt(vars + eselon)
+
     def _optimize(self, samples, labels):
         n_hidden = max(samples.shape[1] / 3, 5)
         n_hidden = int(floor(n_hidden))
@@ -126,7 +134,7 @@ class MLP:
         label = tf.placeholder(tf.float32, shape=(self.batch_size_, labels.shape[1]), name="Y")
 
         hidden = self._relu(x, h)
-        
+        hidden = self._batch_normalization(hidden)
         y_pred = tf.matmul(hidden, y)
 
         loss, optimize_action = None, None
@@ -157,6 +165,7 @@ class MLP:
                 loss_value, _ = self.sess_.run([loss, optimize_action], feed_dict=values)
                 print(loss_value)
                 if self._is_convergent(loss_value):
+                    print(self.best_loss_value_)
                     return
 
         print("Failed to converge")
@@ -179,7 +188,6 @@ class MLP:
         y_pred_value = self.sess_.run(y_pred, feed_dict=value)
             
         return y_pred_value
-            
 
 if __name__ == '__main__':
     data = datasets.load_iris()
