@@ -8,7 +8,13 @@ from sklearn import preprocessing
 from math import floor
 
 class MLP:
-    def __init__(self, learning_rate, gradient_type, relu = None, batch_size = 100, max_iteration = 100000, tolerent = 1e-2):
+    def __init__(self, 
+                 learning_rate,
+                 gradient_type, 
+                 relu = None,
+                 batch_size = 100, 
+                 max_iteration = 100000, 
+                 tolerent = 1e-2):
         self.learning_rate_ = learning_rate
         self.batch_size_ = batch_size
         self.max_iteration_ = max_iteration
@@ -55,26 +61,30 @@ class MLP:
         new_w2 = w2.assign(w2 - velocity2)
         return loss, tf.group(new_w1, new_w2)
 
-    def _nesterov_gradient_descent(self, loss, w1, w2):
+    def _nesterov_gradient_descent(self, input, label, w1, w2): 
         vel_1_shape = (self.n_features_, self.neuron_num_)
         vel_2_shape = (self.neuron_num_, self.n_labels_dim_)
         velocity1 = tf.Variable(tf.zeros(vel_1_shape))
         velocity2 = tf.Variable(tf.zeros(vel_2_shape))
-
-        gama = 0.9
-
         future_1 = tf.Variable(w1)
         future_2 = tf.Variable(w2)
-        new_future_1 = future_1.assign(future_1 - gama * velocity1)
-        new_future_2 = future_2.assign(future_2 - gama * velocity2)
-        grad_w1, grad_w2 = tf.gradients(loss, [future_1, future_2])
-        velocity1 = velocity1.assign(gama * velocity1 + grad_w1 * self.learning_rate_)
-        velocity2 = velocity2.assign(gama * velocity2 + grad_w2 * self.learning_rate_)
+        gama = 0.9
+
+        hidden = self._relu(input, future_1)
+        y_pred = tf.matmul(hidden, future_2)
+        diff = y_pred - label
+        loss = tf.reduce_mean(tf.reduce_sum(diff ** 2, axis=1))
+
+        grad_1, grad_2 = tf.gradients(loss, [future_1, future_2])
+        velocity1 = velocity1.assign(gama * velocity1 + grad_1 * self.learning_rate_)
+        velocity2 = velocity2.assign(gama * velocity2 + grad_2 * self.learning_rate_)
+        new_future_1 = future_1.assign(w1 - gama * velocity1)
+        new_future_2 = future_2.assign(w2 - gama * velocity2)
         new_w1 = w1.assign(w1 - velocity1)
         new_w2 = w2.assign(w2 - velocity2)
         return loss, tf.group(new_future_1, new_future_2, new_w1, new_w2)
 
-    def _handcraft_optimizer(self, y_pred, y, w1, w2):
+    def _handcraft_optimizer(self, input, y_pred, y, w1, w2):
         diff = y_pred - y
         loss = tf.reduce_mean(tf.reduce_sum(diff ** 2, axis=1))
 
@@ -83,7 +93,7 @@ class MLP:
         elif self.gradient_type_ == 'momentum':
             return self._momentum_gradient_descent(loss, w1, w2) 
         elif self.gradient_type_ == 'nesterov':
-            return self._nesterov_gradient_descent(loss, w1, w2)
+            return self._nesterov_gradient_descent(input, y, w1, w2)
         else:
             raise ValueError('Not support gradient type')
 
@@ -108,17 +118,18 @@ class MLP:
         
         return self.no_improvement_num_ >= self.max_no_improvement_num_
 
-    def _batch_normalization(self, hidden):
-        return hidden
+    def _batch_normalization(self, input): 
+        return input
         
-        mean = tf.reduce_mean(hidden, axis=0)
-        vars = tf.reduce_mean((hidden - mean) ** 2, axis=0)
-        eselon = 1e-8
-        return hidden - mean / tf.sqrt(vars + eselon)
+        # mean = tf.reduce_mean(input, axis=0)
+        # vars = tf.reduce_mean((input - mean) ** 2, axis=0)
+        # eselon = 1e-8
+        # return input - mean / tf.sqrt(vars + eselon)
 
     def _optimize(self, samples, labels):
-        n_hidden = max(samples.shape[1] / 3, 5)
+        n_hidden = max(samples.shape[1] / 2, 8)
         n_hidden = int(floor(n_hidden))
+        
         self.neuron_num_ = n_hidden
         self.n_features_ = samples.shape[1]
         self.n_labels_dim_ = labels.shape[1]
@@ -133,13 +144,13 @@ class MLP:
 
         label = tf.placeholder(tf.float32, shape=(self.batch_size_, labels.shape[1]), name="Y")
 
+        x = self._batch_normalization(x)
         hidden = self._relu(x, h)
-        hidden = self._batch_normalization(hidden)
         y_pred = tf.matmul(hidden, y)
 
         loss, optimize_action = None, None
         if self.gradient_type_ is not None:
-            loss, optimize_action = self._handcraft_optimizer(y_pred, label, h, y)
+            loss, optimize_action = self._handcraft_optimizer(x, y_pred, label, h, y)
         else:
             loss, optimize_action = self._predifined_optimizer(y_pred, label)
         
@@ -163,9 +174,9 @@ class MLP:
                     label: batch_labels
                 }
                 loss_value, _ = self.sess_.run([loss, optimize_action], feed_dict=values)
-                print(loss_value)
+                # print(loss_value)
                 if self._is_convergent(loss_value):
-                    print(self.best_loss_value_)
+                    # print(self.best_loss_value_)
                     return
 
         print("Failed to converge")
@@ -179,6 +190,7 @@ class MLP:
 
     def predict(self, X):
         input = tf.placeholder(tf.float32, X.shape)
+        # input = self._batch_normalization(input)
         hidden = self._relu(input, self.hidden_weight_)
         y_pred = tf.matmul(hidden, self.output_weight_)
 
@@ -203,7 +215,7 @@ if __name__ == '__main__':
 
     encoded_y = preprocessing.OneHotEncoder().fit_transform(y).toarray()
     # print(encoded_y)
-    mlp = MLP(1e-3, 'vanilia', relu='leaky', batch_size=80, tolerent=1e-5)
+    mlp = MLP(1e-3, 'nesterov', relu='leaky', batch_size=90, tolerent=1e-5)
     mlp.fit(X, encoded_y)
 
     y_pred = mlp.predict(X)
