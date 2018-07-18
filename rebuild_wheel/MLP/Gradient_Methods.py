@@ -5,7 +5,7 @@ from sklearn import datasets
 from sklearn import metrics
 from sklearn import neural_network
 from sklearn import preprocessing
-from math import floor
+from math import floor, sqrt
 
 class MLP:
     def __init__(self, 
@@ -14,7 +14,8 @@ class MLP:
                  relu = None,
                  batch_size = 100, 
                  max_iteration = 100000, 
-                 tolerent = 1e-2):
+                 tolerent = 1e-2,
+                 rigid = 1e-6):
         self.learning_rate_ = learning_rate
         self.batch_size_ = batch_size
         self.max_iteration_ = max_iteration
@@ -24,10 +25,11 @@ class MLP:
         self.best_loss_value_ = 1000000.
         self.no_improvement_num_ = 0
         self.max_no_improvement_num_ = 500
+        self.rigid_ = rigid
 
     def _init_weights(self, hidden_shape, output_shape):
-        w1 = tf.random_normal(hidden_shape)
-        w2 = tf.random_normal(output_shape)
+        w1 = tf.random_normal(hidden_shape) * sqrt(2.0 / hidden_shape[0])
+        w2 = tf.random_normal(output_shape) * sqrt(2.0 / output_shape[0])
         return w1, w2
 
     def _predifined_optimizer(self, y_pred, y):
@@ -85,17 +87,21 @@ class MLP:
         return loss, tf.group(new_future_1, new_future_2, new_w1, new_w2)
 
     def _handcraft_optimizer(self, input, y_pred, y, w1, w2):
-        diff = y_pred - y
-        loss = tf.reduce_mean(tf.reduce_sum(diff ** 2, axis=1))
+        loss = self._objective_loss(y_pred, y)
+        regularization = tf.reduce_sum(self.rigid_ * (w1 * w1)) + tf.reduce_sum(self.rigid_ * (w2 * w2))
+        loss_aug = tf.add(loss, 0.5 * regularization)
 
         if self.gradient_type_ == 'vanilia':
-            return self._vanilia_gradient_descent(loss, w1, w2)
+            return self._vanilia_gradient_descent(loss_aug, w1, w2)
         elif self.gradient_type_ == 'momentum':
-            return self._momentum_gradient_descent(loss, w1, w2) 
+            return self._momentum_gradient_descent(loss_aug, w1, w2) 
         elif self.gradient_type_ == 'nesterov':
             return self._nesterov_gradient_descent(input, y, w1, w2)
         else:
             raise ValueError('Not support gradient type')
+
+    def _objective_loss(self, y_pred, y):
+        pass
 
     def _relu(self, input, hidden_weight):
         if self.relu_ is None:
@@ -169,6 +175,9 @@ class MLP:
                 batch_samples = batch_data[:,:samples.shape[1]]
                 batch_labels = batch_data[:,samples.shape[1]:]
 
+                batch_samples -= np.mean(batch_samples, axis=0)
+                # batch_samples /= np.std(batch_samples, axis=0)
+
                 values = {
                     x: batch_samples,
                     label: batch_labels
@@ -189,13 +198,15 @@ class MLP:
         self._optimize(samples, labels)
 
     def predict(self, X):
+        samples = X - np.mean(X, axis=0)
+        # samples /= np.std(samples, axis=0)
+
         input = tf.placeholder(tf.float32, X.shape)
-        # input = self._batch_normalization(input)
         hidden = self._relu(input, self.hidden_weight_)
         y_pred = tf.matmul(hidden, self.output_weight_)
 
         value = {
-            input: X
+            input: samples
         }
         y_pred_value = self.sess_.run(y_pred, feed_dict=value)
             
@@ -215,7 +226,7 @@ if __name__ == '__main__':
 
     encoded_y = preprocessing.OneHotEncoder().fit_transform(y).toarray()
     # print(encoded_y)
-    mlp = MLP(1e-3, 'nesterov', relu='leaky', batch_size=90, tolerent=1e-5)
+    mlp = MLP(1e-4, None, relu='leaky', batch_size=90, tolerent=1e-5, rigid=0)
     mlp.fit(X, encoded_y)
 
     y_pred = mlp.predict(X)
