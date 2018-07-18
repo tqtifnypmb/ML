@@ -100,8 +100,23 @@ class MLP:
         else:
             raise ValueError('Not support gradient type')
 
-    def _objective_loss(self, y_pred, y):
+    def _svm_loss(self, y_pred, y):
+        row_idx = 0
+        score = 0
+        for row in y:
+            true_col_idx = row[0]
+            y_pred_row = y_pred[row_idx]
+            true_score = y_pred_row[true_col_idx]
+            for col in y_pred_row:
+                score += np.max(col - true_score + 1, 0)
+
+        return score
+
+    def _softmax_loss(self, y_pred, y):
         pass
+
+    def _objective_loss(self, y_pred, y):
+        return self._svm_loss(y_pred, y)
 
     def _relu(self, input, hidden_weight):
         if self.relu_ is None:
@@ -126,11 +141,6 @@ class MLP:
 
     def _batch_normalization(self, input): 
         return input
-        
-        # mean = tf.reduce_mean(input, axis=0)
-        # vars = tf.reduce_mean((input - mean) ** 2, axis=0)
-        # eselon = 1e-8
-        # return input - mean / tf.sqrt(vars + eselon)
 
     def _optimize(self, samples, labels):
         n_hidden = max(samples.shape[1] / 2, 8)
@@ -183,7 +193,7 @@ class MLP:
                     label: batch_labels
                 }
                 loss_value, _ = self.sess_.run([loss, optimize_action], feed_dict=values)
-                # print(loss_value)
+                print(loss_value)
                 if self._is_convergent(loss_value):
                     # print(self.best_loss_value_)
                     return
@@ -226,7 +236,7 @@ if __name__ == '__main__':
 
     encoded_y = preprocessing.OneHotEncoder().fit_transform(y).toarray()
     # print(encoded_y)
-    mlp = MLP(1e-4, None, relu='leaky', batch_size=90, tolerent=1e-5, rigid=0)
+    mlp = MLP(1e-3, None, relu='leaky', batch_size=90, tolerent=1e-6, rigid=0)
     mlp.fit(X, encoded_y)
 
     y_pred = mlp.predict(X)
