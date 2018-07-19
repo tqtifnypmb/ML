@@ -24,7 +24,7 @@ class MLP:
         self.relu_ = relu
         self.best_loss_value_ = 1000000.
         self.no_improvement_num_ = 0
-        self.max_no_improvement_num_ = 500
+        self.max_no_improvement_num_ = 10
         self.rigid_ = rigid
 
     def _init_weights(self, hidden_shape, output_shape):
@@ -113,8 +113,7 @@ class MLP:
         return score
 
     def _cross_entropy_loss(self, y_pred, y):
-        tf.losses.softmax_cross_entropy(y, y_pred)
-        pass
+        return tf.losses.softmax_cross_entropy(y, y_pred)
 
     def _objective_loss(self, y_pred, y):
         return self._cross_entropy_loss(y_pred, y)
@@ -178,26 +177,32 @@ class MLP:
         data = np.hstack((samples, labels)).astype(np.float32)
         n_batch = samples.shape[0] / self.batch_size_
         n_batch = int(floor(n_batch))
-        for _ in range(self.max_iteration_):
+        loss_value = 0
+        for iter in range(self.max_iteration_):
             # batch stochastic gradient descent
             np.random.shuffle(data)
             batch_idx = 0
+            batch_loss = 0
             for _ in range(n_batch):
                 batch_data = data[self.batch_size_ * batch_idx: self.batch_size_ * (batch_idx + 1)]
                 batch_samples = batch_data[:,:samples.shape[1]]
                 batch_labels = batch_data[:,samples.shape[1]:]
 
                 batch_samples -= np.mean(batch_samples, axis=0)
-                # batch_samples /= np.std(batch_samples, axis=0)
+                #batch_samples /= np.std(batch_samples, axis=0)
 
                 values = {
                     x: batch_samples,
                     label: batch_labels
                 }
-                loss_value, _ = self.sess_.run([loss, optimize_action], feed_dict=values)
+                batch_loss_value, _ = self.sess_.run([loss, optimize_action], feed_dict=values)
+                batch_loss += batch_loss_value
+            batch_loss /= n_batch
+            loss_value += batch_loss
+            if iter > 0 and iter % 500 == 0:
+                loss_value /= iter
                 print(loss_value)
                 if self._is_convergent(loss_value):
-                    # print(self.best_loss_value_)
                     return
 
         print("Failed to converge")
@@ -237,8 +242,8 @@ if __name__ == '__main__':
     print(sk_ac)
 
     encoded_y = preprocessing.OneHotEncoder().fit_transform(y).toarray()
-    # print(encoded_y)
-    mlp = MLP(1e-3, None, relu='leaky', batch_size=90, tolerent=1e-6, rigid=0)
+    
+    mlp = MLP(1e-3, None, relu='leaky', batch_size=90, tolerent=1e-4, rigid=1e-2)
     mlp.fit(X, encoded_y)
 
     y_pred = mlp.predict(X)
