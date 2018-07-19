@@ -112,11 +112,13 @@ class MLP:
 
         return score
 
-    def _softmax_loss(self, y_pred, y):
+    def _cross_entropy_loss(self, y_pred, y):
+        tf.losses.softmax_cross_entropy(y, y_pred)
         pass
 
     def _objective_loss(self, y_pred, y):
-        return self._svm_loss(y_pred, y)
+        return self._cross_entropy_loss(y_pred, y)
+        #return self._svm_loss(y_pred, y)
 
     def _relu(self, input, hidden_weight):
         if self.relu_ is None:
