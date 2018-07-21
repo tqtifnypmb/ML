@@ -13,7 +13,7 @@ class MLP:
                  gradient_type, 
                  relu = None,
                  batch_size = 100, 
-                 max_iteration = 100000, 
+                 max_iteration = 200, 
                  tolerent = 1e-2,
                  rigid = 1e-6):
         self.learning_rate_ = learning_rate
@@ -140,6 +140,11 @@ class MLP:
         
         return self.no_improvement_num_ >= self.max_no_improvement_num_
 
+    def _softmax(self, x):
+        trans_x = tf.transpose(x)
+        ret = tf.exp(trans_x) / tf.reduce_sum(tf.exp(trans_x), axis=0)
+        return tf.transpose(ret)
+
     def _batch_normalization(self, input): 
         return input
 
@@ -163,8 +168,9 @@ class MLP:
 
         x = self._batch_normalization(x)
         hidden = self._relu(x, h)
-        y_pred = tf.matmul(hidden, y)
-
+        predict = tf.matmul(hidden, y)
+        y_pred = self._softmax(predict)#tf.nn.softmax(predict)
+    
         loss, optimize_action = None, None
         if self.gradient_type_ is not None:
             loss, optimize_action = self._handcraft_optimizer(x, y_pred, label, h, y)
@@ -243,7 +249,7 @@ if __name__ == '__main__':
 
     encoded_y = preprocessing.OneHotEncoder().fit_transform(y).toarray()
     
-    mlp = MLP(1e-3, None, relu='leaky', batch_size=90, tolerent=1e-4, rigid=1e-2)
+    mlp = MLP(1e-2, None, relu=None, batch_size=32, tolerent=1e-6, rigid=1e-4)
     mlp.fit(X, encoded_y)
 
     y_pred = mlp.predict(X)
