@@ -14,7 +14,9 @@ class MLP:
     def _create_model(self, n_features, n_hidden, n_classes):
         model = keras.Sequential()
 
-        activation_layer = keras.layers.Dense(n_hidden, input_shape=(n_features,), activation='relu')
+        activation_layer = keras.layers.Dense(n_hidden, 
+                                              input_dim=n_features, 
+                                              activation='relu')
         model.add(activation_layer)
 
         output_layer = keras.layers.Dense(n_classes, activation='softmax')

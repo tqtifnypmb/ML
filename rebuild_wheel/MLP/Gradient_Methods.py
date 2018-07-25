@@ -28,8 +28,10 @@ class MLP:
         self.rigid_ = rigid
 
     def _init_weights(self, hidden_shape, output_shape):
-        w1 = tf.random_normal(hidden_shape) * sqrt(2.0 / hidden_shape[0])
-        w2 = tf.random_normal(output_shape) * sqrt(2.0 / output_shape[0])
+        var_w1 = 2 / hidden_shape[0]
+        var_w2 = 2 / output_shape[0]
+        w1 = tf.random_normal(hidden_shape, stddev=sqrt(var_w1)) * sqrt(2.0 / hidden_shape[0])
+        w2 = tf.random_normal(output_shape, stddev=sqrt(var_w2)) * sqrt(2.0 / output_shape[0])
         return w1, w2
 
     def _predifined_optimizer(self, y_pred, y):
@@ -205,13 +207,11 @@ class MLP:
                 batch_loss += batch_loss_value
             batch_loss /= n_batch
             loss_value += batch_loss
-            if iter > 0 and iter % 500 == 0:
+            if iter > 0 and iter % 50 == 0:
                 loss_value /= iter
                 print(loss_value)
                 if self._is_convergent(loss_value):
                     return
-
-        print("Failed to converge")
 
     def fit(self, samples, labels):
         n_samples = samples.shape[0]
@@ -249,7 +249,7 @@ if __name__ == '__main__':
 
     encoded_y = preprocessing.OneHotEncoder().fit_transform(y).toarray()
     
-    mlp = MLP(1e-2, None, relu=None, batch_size=32, tolerent=1e-6, rigid=1e-4)
+    mlp = MLP(1e-2, None, relu=None, batch_size=80, tolerent=1e-6, rigid=1e-4)
     mlp.fit(X, encoded_y)
 
     y_pred = mlp.predict(X)
