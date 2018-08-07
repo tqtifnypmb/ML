@@ -1,14 +1,14 @@
 import tensorflow as tf
-import numpy as np
 
 class RNN: 
-    def __init__(self, num_classes, hidden_size, num_layers, dropout_prob, vocab_size, seq_len, batch_size):
+    def __init__(self, num_classes, hidden_size, num_layers, dropout_prob, seq_len, batch_size):
         cell, self.initial_state = self._build_lstm(hidden_size, num_layers, batch_size, dropout_prob)
         self.inputs, self.targets = self._build_inputs(batch_size, seq_len)
 
         outputs, self.final_state = tf.nn.dynamic_rnn(cell, self.inputs, initial_state=self.initial_state)
+        logits = self._build_output(outputs, seq_len, batch_size, num_classes)
 
-        self.loss = self._build_loss(outputs, self.targets, num_classes)
+        self.loss = self._build_loss(logits, self.targets, num_classes)
      
     def _build_inputs(self, batch_size, seq_len):
         inputs = tf.placeholder(tf.float32, (batch_size, seq_len), 'inputs')
@@ -29,5 +29,18 @@ class RNN:
         loss = tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=reshaped_targets)
         return tf.reduce_mean(loss)
 
-if __name__ == '__main__':
+    def _build_output(self, output, seq_len, batch_size, num_classes):
+        with tf.variable_scope('softmax'):
+            w = tf.get_variable('w', (batch_size, seq_len))
+            b = tf.get_variable('b', (num_classes,), initializer=tf.constant_initializer(0.0))
+        logits = tf.matmul(output, w) + b
+        return logits
+
+def batch_sample_generator(sample, batch_size):
     pass
+
+if __name__ == '__main__':
+    with open('sample.txt', 'r') as input:
+        vocab = input.read()
+
+    
