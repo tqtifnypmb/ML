@@ -2,9 +2,9 @@ import tensorflow as tf
 import numpy as np
 
 class RNN: 
-    def __init__(self, vocab_size, unit_per_cell, num_of_layers, seq_len, batch_size):
+    def __init__(self, num_classes, num_units, num_layers, seq_len, batch_size):
         self.inputs, self.targets = self._build_inputs(seq_len)
-        self.cell = self._build_lstm_cell(unit_per_cell, num_of_layers)
+        self.cell = self._build_lstm_cell(num_units, num_layers)
         self.initial_state = self.cell.zero_state(batch_size, tf.float32)
 
         x = tf.reshape(self.inputs, [-1, seq_len])
@@ -13,16 +13,14 @@ class RNN:
         self.final_state = state
 
         # self.loss = None
-        self.weights = tf.random_normal([unit_per_cell, vocab_size])
-        self.bias = tf.Variable(tf.random_normal([vocab_size]))
+        self.weights = tf.random_normal([num_units, num_classes])
+        self.bias = tf.Variable(tf.random_normal([num_classes]))
         output = tf.matmul(y[-1], self.weights) + self.bias
 
-        encoded_targets = tf.one_hot(tf.cast(self.targets, tf.int32), vocab_size)
-        encoded_targets = tf.cast(encoded_targets, tf.float32)
-        self.loss = self._build_loss(output, encoded_targets)
+        self.loss = self._build_loss(output, self.targets)
         
     def _build_inputs(self, seq_len):
-        x = tf.placeholder(tf.float32, [None, seq_len], name="inputs")
+        x = tf.placeholder(tf.float32, [None, seq_len, 1], name="inputs")
         y = tf.placeholder(tf.float32, [None, seq_len], name="targets")
         return x, y
 
@@ -66,17 +64,22 @@ if __name__ == '__main__':
         vocab = list(input.read())
 
     vocab_index, index_dict = preprocess_sample(vocab)
-    batch_size = 20
-    seq_len = 1
-    model = RNN(len(index_dict), 256, 1, seq_len, batch_size)
+    batch_size = 60
+    num_classes = len(index_dict)
+    seq_len = 20
+    num_units = 20
+    num_layers = num_classes
+    model = RNN(num_classes, num_units, num_layers, seq_len, batch_size)
     
     tf.global_variables_initializer()
     with tf.Session() as sess:
         newest_state = sess.run(model.initial_state)
         optimizer = tf.train.AdamOptimizer().minimize(model.loss)
         for batch_x, batch_y in batch_sample_generator(vocab_index, batch_size):
+            x = batch_x.reshape(-1, seq_len)
+            x = np.split(x, seq_len, 1)
             feed = {
-                model.inputs: batch_x.reshape(-1, seq_len),
+                model.inputs: x,
                 model.targets: batch_y,
                 model.initial_state: newest_state,
             }

@@ -102,3 +102,6 @@ ENV/
 
 # UCI data
 uci_data/
+
+.vscode
+*.txt
