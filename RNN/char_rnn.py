@@ -54,26 +54,29 @@ if __name__ == '__main__':
     num_classes = len(index_dict)
     seq_len = 3
     num_units = 20
+    num_iteration = 5
     model = RNN(seq_len, num_classes, num_units, batch_size)
 
     with tf.Session() as sess:
         optimizer = tf.train.AdamOptimizer().minimize(model.loss)
         sess.run(tf.global_variables_initializer())
 
-        for batch_x, batch_y in batch_sample_generator(vocab_index, batch_size * seq_len):
-            x = batch_x.reshape(-1, 1, seq_len)
-            y_one_hot = np.zeros([1, num_classes])
-            y_one_hot[0][batch_y] = 1
-            feed = {
-                model.inputs: x,
-                model.targets: y_one_hot,
-            }
+        for i in range(num_iteration):
+            for batch_x, batch_y in batch_sample_generator(vocab_index, batch_size * seq_len):
+                x = batch_x.reshape(-1, 1, seq_len)
+                y_one_hot = np.zeros([1, num_classes])
+                y_one_hot[0][batch_y] = 1
+                feed = {
+                    model.inputs: x,
+                    model.targets: y_one_hot,
+                }
 
-            batch_loss, _ = sess.run([model.loss, optimizer], feed_dict=feed)
-            pred = sess.run([model.prediction], feed_dict=feed)
-            pred_idx = pred[0][0]
-            print('batch loss %d' % batch_loss)
-            print("{0} {1} {2} - {3}".format(index_dict[batch_x[0]],
-                                             index_dict[batch_x[1]],
-                                             index_dict[batch_x[2]],
-                                             index_dict[pred_idx]))
+                batch_loss, _ = sess.run([model.loss, optimizer], feed_dict=feed)
+                if i == num_iteration:
+                    pred = sess.run([model.prediction], feed_dict=feed)
+                    pred_idx = pred[0][0]
+                    print('batch loss %d' % batch_loss)
+                    print("{0} {1} {2} - {3}".format(index_dict[batch_x[0]],
+                                                    index_dict[batch_x[1]],
+                                                    index_dict[batch_x[2]],
+                                                    index_dict[pred_idx]))
