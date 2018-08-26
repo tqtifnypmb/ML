@@ -9,19 +9,19 @@ class LSTM:
         self.cell = tf.nn.rnn_cell.BasicLSTMCell(num_units)
 
         X = tf.unstack(self.inputs, seq_len, 1)
-        self.hidden_state, self.cell_state = tf.nn.static_rnn(self.cell, X, dtype=tf.float32)
+        hidden_state, _ = tf.nn.static_rnn(self.cell, X, dtype=tf.float32)
        
         self.weights = tf.Variable(tf.random_normal([num_units, vocab_size]))
         self.bias = tf.Variable(tf.random_normal([vocab_size]))
 
-        Y = tf.matmul(self.hidden_state[-1], self.weights) + self.bias
+        Y = tf.matmul(hidden_state[-1], self.weights) + self.bias
         batch_loss = tf.nn.softmax_cross_entropy_with_logits_v2(logits=Y, labels=self.targets)
         self.loss = tf.reduce_mean(batch_loss)
 
     def predict(self, sess, init_value, output_len, idx_to_char):
         vocab_len = len(idx_to_char)
-        h_state = self.hidden_state[-1]
-        c_state = self.cell_state
+        h_state = np.zeros([1, self.cell.state_size.h], dtype=np.float32)
+        c_state = np.zeros([1, self.cell.state_size.c], dtype=np.float32)
 
         value = tf.placeholder(tf.float32, [None, vocab_len], name='pred_value')
       
@@ -32,11 +32,8 @@ class LSTM:
         for _ in range(output_len):
             outputs, state = self.cell(inputs=value, state=(c_state, h_state))
             c_state, h_state = state
-
-            # print(outputs[-1].shape)
-            # return
             
-            Y = tf.matmul(outputs[-1], self.weights) + self.bias
+            Y = tf.matmul(outputs, self.weights) + self.bias
             
             feed_dict = {
                 self.inputs: np.zeros([1, 20, vocab_len]),
@@ -47,9 +44,8 @@ class LSTM:
             py = sess.run([Y], feed_dict=feed_dict)
             idx = np.argmax(py[0])
      
-            cur_value = np.zeros([vocab_len])
+            cur_value = np.zeros_like(cur_value)
             cur_value[idx] = 1
-            print(cur_value.shape)
 
             char = idx_to_char[idx]
             pred.append(char)
@@ -92,19 +88,21 @@ if __name__ == '__main__':
     num_units = 128
     model = LSTM(num_units, seq_len, batch_size, len(char_to_idx))
     learning_rate = 1e-1
+    num_epoches = 5
 
     optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(model.loss)
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
 
-        for inputs, targets in next_batch(sample, batch_size, seq_len, char_to_idx):
-            feed_dict = {
-                model.inputs: inputs,
-                model.targets: targets
-            }
+        for _ in range(num_epoches):
+            for inputs, targets in next_batch(sample, batch_size, seq_len, char_to_idx):
+                feed_dict = {
+                    model.inputs: inputs,
+                    model.targets: targets
+                }
 
-            _, loss = sess.run([optimizer, model.loss], feed_dict=feed_dict)
+                _, loss = sess.run([optimizer, model.loss], feed_dict=feed_dict)
+                print(loss)
 
-            print(loss)
-
-        model.predict(sess, char_to_idx['a'], 10, idx_to_char)
+        pred = model.predict(sess, char_to_idx['a'], 100, idx_to_char)
+        print(pred)
