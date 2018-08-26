@@ -18,7 +18,7 @@ class LSTM:
         batch_loss = tf.nn.softmax_cross_entropy_with_logits_v2(logits=Y, labels=self.targets)
         self.loss = tf.reduce_mean(batch_loss)
 
-    def predict(self, sess, init_value, output_len, idx_to_char):
+    def predict(self, sess, init_value, output_len, seq_len, idx_to_char):
         vocab_len = len(idx_to_char)
         h_state = np.zeros([1, self.cell.state_size.h], dtype=np.float32)
         c_state = np.zeros([1, self.cell.state_size.c], dtype=np.float32)
@@ -36,7 +36,7 @@ class LSTM:
             Y = tf.matmul(outputs, self.weights) + self.bias
             
             feed_dict = {
-                self.inputs: np.zeros([1, 20, vocab_len]),
+                self.inputs: np.zeros([1, seq_len, vocab_len]),
                 self.targets: np.zeros([1, vocab_len]),
                 value: cur_value.reshape(-1, vocab_len)
             }
@@ -83,12 +83,12 @@ if __name__ == '__main__':
         sample = list(input.read())
 
     char_to_idx, idx_to_char = build_dataset(sample)
-    batch_size = 20
-    seq_len = 20
+    batch_size = 50
+    seq_len = 200
     num_units = 128
     model = LSTM(num_units, seq_len, batch_size, len(char_to_idx))
-    learning_rate = 1e-1
-    num_epoches = 5
+    learning_rate = 1e-2
+    num_epoches = 10
 
     optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(model.loss)
     with tf.Session() as sess:
@@ -104,5 +104,6 @@ if __name__ == '__main__':
                 _, loss = sess.run([optimizer, model.loss], feed_dict=feed_dict)
                 print(loss)
 
-        pred = model.predict(sess, char_to_idx['a'], 100, idx_to_char)
-        print(pred)
+        init_char = 'a'
+        pred = model.predict(sess, char_to_idx[init_char], 200, seq_len, idx_to_char)
+        print(init_char.join(pred))
