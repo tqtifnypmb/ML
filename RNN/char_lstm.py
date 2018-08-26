@@ -9,7 +9,7 @@ class LSTM:
         self.cell = tf.nn.rnn_cell.BasicLSTMCell(num_units)
 
         X = tf.unstack(self.inputs, seq_len, 1)
-        self.hidden_state, _ = tf.nn.static_rnn(self.cell, X, dtype=tf.float32)
+        self.hidden_state, self.cell_state = tf.nn.static_rnn(self.cell, X, dtype=tf.float32)
        
         self.weights = tf.Variable(tf.random_normal([num_units, vocab_size]))
         self.bias = tf.Variable(tf.random_normal([vocab_size]))
@@ -20,8 +20,9 @@ class LSTM:
 
     def predict(self, sess, init_value, output_len, idx_to_char):
         vocab_len = len(idx_to_char)
-        state = self.hidden_state[-1]
-        
+        h_state = self.hidden_state[-1]
+        c_state = self.cell_state
+
         value = tf.placeholder(tf.float32, [None, vocab_len], name='pred_value')
       
         cur_value = np.zeros([vocab_len])
@@ -29,10 +30,13 @@ class LSTM:
         
         pred = []
         for _ in range(output_len):
-            outputs, next_state = self.cell(inputs=value, state=[1., state])
-            state = next_state
+            outputs, state = self.cell(inputs=value, state=(c_state, h_state))
+            c_state, h_state = state
+
+            # print(outputs[-1].shape)
+            # return
             
-            Y = tf.matmul(outputs, self.weights) + self.bias
+            Y = tf.matmul(outputs[-1], self.weights) + self.bias
             
             feed_dict = {
                 self.inputs: np.zeros([1, 20, vocab_len]),
