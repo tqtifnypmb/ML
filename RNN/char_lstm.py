@@ -1,82 +1,94 @@
 import tensorflow as tf
 import numpy as np
 
-class RNN: 
-    def __init__(self, seq_len, num_classes, num_units, batch_size):
-        self.inputs = tf.placeholder(tf.float32, [None, 1, seq_len], name="inputs")
-        self.targets = tf.placeholder(tf.float32, [None, num_classes])
+class LSTM:
+    def __init__(self, num_units, seq_len, batch_size, vocab_size):
+        self.inputs = tf.placeholder(tf.float32, [None, seq_len, vocab_size], name='inputs')
+        self.targets = tf.placeholder(tf.float32, [None, vocab_size], name='targets')
+
         self.cell = tf.nn.rnn_cell.BasicLSTMCell(num_units)
 
-        x = tf.unstack(self.inputs, 1, axis=1)
-        outputs, _ = tf.nn.static_rnn(self.cell, x, dtype=tf.float32)
+        X = tf.unstack(self.inputs, seq_len, 1)
+        self.hidden_state, _ = tf.nn.static_rnn(self.cell, X, dtype=tf.float32)
+       
+        self.weights = tf.Variable(tf.random_normal([num_units, vocab_size]))
+        self.bias = tf.Variable(tf.random_normal([vocab_size]))
 
-        self.weight = tf.Variable(tf.random_normal([num_units, num_classes]))
-        self.bias = tf.Variable(tf.random_normal([num_classes]))
+        Y = tf.matmul(self.hidden_state[-1], self.weights) + self.bias
+        batch_loss = tf.nn.softmax_cross_entropy_with_logits_v2(logits=Y, labels=self.targets)
+        self.loss = tf.reduce_mean(batch_loss)
 
-        self.logits = tf.matmul(outputs[-1], self.weight) + self.bias
+    def predict(self, sess, init_value, output_len, idx_to_char):
+        print(self.cell.state_size)
+        print(self.hidden_state[-1].shape)
+        return
+        state = self.hidden_state[-1]
+        value = tf.placeholder(tf.float32, [None, 1], name='pred_value')
+        cur_value = np.asarray([init_value]).reshape(-1, 1)
 
-        self.loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=self.logits, 
-                                                                           labels=self.targets))
-        
-        pred = tf.nn.softmax(self.logits)
-        pred = tf.reduce_mean(pred, 0)
-        pred = tf.reshape(pred, (1,-1))
-        self.prediction = tf.argmax(pred, 1)
+        pred = []
+        for _ in range(output_len):
+            outputs, state = self.cell(inputs=value, state=[1, state])
+            print(outputs.shape)
+            Y = tf.matmul(outputs[-1], self.weights) + self.bias
+            
+            feed_dict = {
+                value: cur_value
+            }
+            py = sess.run([Y], feed_dict=feed_dict)
+            idx = tf.argmax(py)
+            cur_value = idx_to_char[idx]
+            pred.append(cur_value)
+            
 
-def batch_sample_generator(sample, batch_size):
-    batch_num = int(len(sample) / batch_size)
-    for batch_idx in range(batch_num):
-        x = sample[batch_idx * batch_size : (batch_idx + 1) * batch_size]
-        y = None
-        if (batch_idx + 1) * batch_size < len(sample):
-            y = [sample[(batch_idx + 1) * batch_size + 1]]
-        else:
-            y = [sample[0]]
-        yield np.asarray(x), np.asarray(y)
+def build_dataset(sample):
+    unique_chars = list(set(sample))
+    char_to_idx = { ch : i for i, ch in enumerate(unique_chars)}
+    idx_to_char = { i : ch for i, ch in enumerate(unique_chars)}
+    return char_to_idx, idx_to_char
 
-def preprocess_sample(sample):
-    duplicated = set()
-    unique = [x for x in sample if not (x in duplicated or duplicated.add(x))]
+def next_batch(sample, batch_size, seq_len, char_to_idx):
+    vocab_len = len(char_to_idx)
 
-    vocab_index = []
-    for c in sample:
-        idx = unique.index(c)
-        vocab_index.append(idx)
+    def one_hot_encode(ch):
+        value = np.zeros([vocab_len])
+        value[char_to_idx[ch]] = 1
+        return value
 
-    return vocab_index, unique
+    batch_len = batch_size * seq_len
+    num_batch = int(len(sample) / batch_len)
+    for i in range(num_batch):
+        p = i * batch_len
+        if p + batch_len + 1 >= len(sample):
+            raise StopIteration()
+
+        inputs = np.asarray([one_hot_encode(ch) for ch in sample[p: p + batch_len]])
+        targets = np.asarray([one_hot_encode(ch) for ch in sample[p + seq_len + 1: p + batch_len + 2: seq_len]])
+
+        yield np.reshape(inputs, [-1, seq_len, vocab_len]), np.reshape(targets, [-1, vocab_len])
 
 if __name__ == '__main__':
-    with open('sample.txt', 'r') as input:
-        vocab = list(input.read())
+    with open('sample_short.txt', 'r') as input:
+        sample = list(input.read())
 
-    vocab_index, index_dict = preprocess_sample(vocab)
-    batch_size = 60
-    num_classes = len(index_dict)
-    seq_len = 3
-    num_units = 20
-    num_iteration = 5
-    model = RNN(seq_len, num_classes, num_units, batch_size)
+    char_to_idx, idx_to_char = build_dataset(sample)
+    batch_size = 5
+    seq_len = 10
+    num_units = 128
+    model = LSTM(num_units, seq_len, batch_size, len(char_to_idx))
 
+    optimizer = tf.train.AdamOptimizer().minimize(model.loss)
     with tf.Session() as sess:
-        optimizer = tf.train.AdamOptimizer().minimize(model.loss)
         sess.run(tf.global_variables_initializer())
 
-        for i in range(num_iteration):
-            for batch_x, batch_y in batch_sample_generator(vocab_index, batch_size * seq_len):
-                x = batch_x.reshape(-1, 1, seq_len)
-                y_one_hot = np.zeros([1, num_classes])
-                y_one_hot[0][batch_y] = 1
-                feed = {
-                    model.inputs: x,
-                    model.targets: y_one_hot,
-                }
+        for inputs, targets in next_batch(sample, batch_size, seq_len, char_to_idx):
+            feed_dict = {
+                model.inputs: inputs,
+                model.targets: targets
+            }
 
-                batch_loss, _ = sess.run([model.loss, optimizer], feed_dict=feed)
-                if i == num_iteration:
-                    pred = sess.run([model.prediction], feed_dict=feed)
-                    pred_idx = pred[0][0]
-                    print('batch loss %d' % batch_loss)
-                    print("{0} {1} {2} - {3}".format(index_dict[batch_x[0]],
-                                                    index_dict[batch_x[1]],
-                                                    index_dict[batch_x[2]],
-                                                    index_dict[pred_idx]))
+            _, loss = sess.run([optimizer, model.loss], feed_dict=feed_dict)
+
+            print(loss)
+
+        model.predict(sess, char_to_idx['a'], 10, idx_to_char)
