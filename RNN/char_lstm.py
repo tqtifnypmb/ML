@@ -19,28 +19,39 @@ class LSTM:
         self.loss = tf.reduce_mean(batch_loss)
 
     def predict(self, sess, init_value, output_len, idx_to_char):
-        print(self.cell.state_size)
-        print(self.hidden_state[-1].shape)
-        return
+        vocab_len = len(idx_to_char)
         state = self.hidden_state[-1]
-        value = tf.placeholder(tf.float32, [None, 1], name='pred_value')
-        cur_value = np.asarray([init_value]).reshape(-1, 1)
-
+        
+        value = tf.placeholder(tf.float32, [None, vocab_len], name='pred_value')
+      
+        cur_value = np.zeros([vocab_len])
+        cur_value[init_value] = 1
+        
         pred = []
         for _ in range(output_len):
-            outputs, state = self.cell(inputs=value, state=[1, state])
-            print(outputs.shape)
-            Y = tf.matmul(outputs[-1], self.weights) + self.bias
+            outputs, next_state = self.cell(inputs=value, state=[1., state])
+            state = next_state
+            
+            Y = tf.matmul(outputs, self.weights) + self.bias
             
             feed_dict = {
-                value: cur_value
+                self.inputs: np.zeros([1, 20, vocab_len]),
+                self.targets: np.zeros([1, vocab_len]),
+                value: cur_value.reshape(-1, vocab_len)
             }
-            py = sess.run([Y], feed_dict=feed_dict)
-            idx = tf.argmax(py)
-            cur_value = idx_to_char[idx]
-            pred.append(cur_value)
-            
 
+            py = sess.run([Y], feed_dict=feed_dict)
+            idx = np.argmax(py[0])
+     
+            cur_value = np.zeros([vocab_len])
+            cur_value[idx] = 1
+            print(cur_value.shape)
+
+            char = idx_to_char[idx]
+            pred.append(char)
+
+        return pred
+            
 def build_dataset(sample):
     unique_chars = list(set(sample))
     char_to_idx = { ch : i for i, ch in enumerate(unique_chars)}
@@ -68,16 +79,17 @@ def next_batch(sample, batch_size, seq_len, char_to_idx):
         yield np.reshape(inputs, [-1, seq_len, vocab_len]), np.reshape(targets, [-1, vocab_len])
 
 if __name__ == '__main__':
-    with open('sample_short.txt', 'r') as input:
+    with open('sample.txt', 'r') as input:
         sample = list(input.read())
 
     char_to_idx, idx_to_char = build_dataset(sample)
-    batch_size = 5
-    seq_len = 10
+    batch_size = 20
+    seq_len = 20
     num_units = 128
     model = LSTM(num_units, seq_len, batch_size, len(char_to_idx))
+    learning_rate = 1e-1
 
-    optimizer = tf.train.AdamOptimizer().minimize(model.loss)
+    optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(model.loss)
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
 
