@@ -11,9 +11,6 @@ class LSTM:
         else:
             self.cell = self._build_cell(num_units)
 
-        # X = tf.unstack(self.inputs, seq_len, 1)
-        # hidden_state, _ = tf.nn.static_rnn(self.cell, X, dtype=tf.float32)
-
         hidden_state, _ = tf.nn.dynamic_rnn(self.cell, self.inputs, dtype=tf.float32)
         hidden_state = tf.unstack(hidden_state, seq_len, 1)
        
@@ -39,7 +36,9 @@ class LSTM:
         cur_value[init_value] = 1
         
         pred = []
-        for _ in range(output_len):
+        for i in range(output_len):
+            print('generating character: %i ' % i)
+
             outputs, state = self.cell(inputs=value, state=cur_state)
             cur_state = state
             
@@ -92,22 +91,26 @@ def next_batch(sample, batch_size, seq_len, char_to_idx):
         yield np.reshape(inputs, [-1, seq_len, vocab_len]), np.reshape(targets, [-1, vocab_len])
 
 if __name__ == '__main__':
-    with open('sample.txt', 'r') as input:
+    with open('input.txt', 'r') as input:
         sample = list(input.read())
 
     char_to_idx, idx_to_char = build_dataset(sample)
-    batch_size = 20
-    seq_len = 1000
-    num_units = 256
-    num_layers = 2
+    batch_size = 64
+    seq_len = 100
+    num_units = 1024
+    num_layers = 1
     model = LSTM(num_units, num_layers, seq_len, batch_size, len(char_to_idx))
     learning_rate = 1e-4
-    num_epoches = 1
+    num_epoches = 30
     optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(model.loss)
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
 
-        for _ in range(num_epoches):
+        print('training...')
+        for i in range(num_epoches):
+            print('===============')
+            print('epoch: %d' % i)
+            print('===============')
             for inputs, targets in next_batch(sample, batch_size, seq_len, char_to_idx):
                 feed_dict = {
                     model.inputs: inputs,
@@ -117,6 +120,7 @@ if __name__ == '__main__':
                 _, loss = sess.run([optimizer, model.loss], feed_dict=feed_dict)
                 print(loss)
 
+        print('predicting...')
         init_char = 'b'
-        pred = model.predict(sess, char_to_idx[init_char], 500, seq_len, idx_to_char)
+        pred = model.predict(sess, char_to_idx[init_char], 400, seq_len, idx_to_char)
         print("".join(pred))
