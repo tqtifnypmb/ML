@@ -2,14 +2,20 @@ import tensorflow as tf
 import numpy as np
 
 class LSTM:
-    def __init__(self, num_units, seq_len, batch_size, vocab_size):
+    def __init__(self, num_units, num_layers, seq_len, batch_size, vocab_size):
         self.inputs = tf.placeholder(tf.float32, [None, seq_len, vocab_size], name='inputs')
         self.targets = tf.placeholder(tf.float32, [None, vocab_size], name='targets')
 
-        self.cell = tf.nn.rnn_cell.BasicLSTMCell(num_units)
+        if num_layers > 1:
+            self.cell = tf.nn.rnn_cell.MultiRNNCell([self._build_cell(num_units) for _ in range(num_layers)])
+        else:
+            self.cell = self._build_cell(num_units)
 
-        X = tf.unstack(self.inputs, seq_len, 1)
-        hidden_state, _ = tf.nn.static_rnn(self.cell, X, dtype=tf.float32)
+        # X = tf.unstack(self.inputs, seq_len, 1)
+        # hidden_state, _ = tf.nn.static_rnn(self.cell, X, dtype=tf.float32)
+
+        hidden_state, _ = tf.nn.dynamic_rnn(self.cell, self.inputs, dtype=tf.float32)
+        hidden_state = tf.unstack(hidden_state, seq_len, 1)
        
         self.weights = tf.Variable(tf.random_normal([num_units, vocab_size]))
         self.bias = tf.Variable(tf.random_normal([vocab_size]))
@@ -18,10 +24,14 @@ class LSTM:
         batch_loss = tf.nn.softmax_cross_entropy_with_logits_v2(logits=Y, labels=self.targets)
         self.loss = tf.reduce_mean(batch_loss)
 
+    def _build_cell(self, num_units):
+        cell = tf.nn.rnn_cell.BasicLSTMCell(num_units)
+        cell = tf.nn.rnn_cell.DropoutWrapper(cell, output_keep_prob=0.5)
+        return cell
+
     def predict(self, sess, init_value, output_len, seq_len, idx_to_char):
         vocab_len = len(idx_to_char)
-        h_state = np.zeros([1, self.cell.state_size.h], dtype=np.float32)
-        c_state = np.zeros([1, self.cell.state_size.c], dtype=np.float32)
+        cur_state = self.cell.zero_state(1, tf.float32)
 
         value = tf.placeholder(tf.float32, [None, vocab_len], name='pred_value')
       
@@ -30,8 +40,8 @@ class LSTM:
         
         pred = []
         for _ in range(output_len):
-            outputs, state = self.cell(inputs=value, state=(c_state, h_state))
-            c_state, h_state = state
+            outputs, state = self.cell(inputs=value, state=cur_state)
+            cur_state = state
             
             Y = tf.matmul(outputs, self.weights) + self.bias
             
@@ -42,7 +52,10 @@ class LSTM:
             }
 
             py = sess.run([Y], feed_dict=feed_dict)
-            idx = np.argmax(py[0])
+            
+            prop = np.squeeze(py, axis=0)
+            prop = np.exp(prop) / np.sum(np.exp(prop))
+            idx = np.random.choice(vocab_len, 1, p=prop)[0]
      
             cur_value = np.zeros_like(cur_value)
             cur_value[idx] = 1
@@ -83,13 +96,13 @@ if __name__ == '__main__':
         sample = list(input.read())
 
     char_to_idx, idx_to_char = build_dataset(sample)
-    batch_size = 50
-    seq_len = 200
-    num_units = 128
-    model = LSTM(num_units, seq_len, batch_size, len(char_to_idx))
-    learning_rate = 1e-2
-    num_epoches = 10
-
+    batch_size = 20
+    seq_len = 1000
+    num_units = 256
+    num_layers = 2
+    model = LSTM(num_units, num_layers, seq_len, batch_size, len(char_to_idx))
+    learning_rate = 1e-4
+    num_epoches = 1
     optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(model.loss)
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
@@ -104,6 +117,6 @@ if __name__ == '__main__':
                 _, loss = sess.run([optimizer, model.loss], feed_dict=feed_dict)
                 print(loss)
 
-        init_char = 'a'
-        pred = model.predict(sess, char_to_idx[init_char], 200, seq_len, idx_to_char)
-        print(init_char.join(pred))
+        init_char = 'b'
+        pred = model.predict(sess, char_to_idx[init_char], 500, seq_len, idx_to_char)
+        print("".join(pred))
