@@ -51,10 +51,7 @@ class LSTM:
             }
 
             py = sess.run([Y], feed_dict=feed_dict)
-            
-            prop = np.squeeze(py, axis=0)
-            prop = np.exp(prop) / np.sum(np.exp(prop))
-            idx = np.random.choice(vocab_len, 1, p=prop)[0]
+            idx = np.argmax(py)
      
             cur_value = np.zeros_like(cur_value)
             cur_value[idx] = 1
@@ -95,7 +92,7 @@ if __name__ == '__main__':
         sample = list(input.read())
 
     char_to_idx, idx_to_char = build_dataset(sample)
-    batch_size = 64
+    batch_size = 128
     seq_len = 100
     num_units = 1024
     num_layers = 1
