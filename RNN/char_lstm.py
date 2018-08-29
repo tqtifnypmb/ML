@@ -98,7 +98,7 @@ if __name__ == '__main__':
     num_layers = 1
     model = LSTM(num_units, num_layers, seq_len, batch_size, len(char_to_idx))
     learning_rate = 1e-4
-    num_epoches = 30
+    num_epoches = 1000
     optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(model.loss)
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
@@ -117,7 +117,13 @@ if __name__ == '__main__':
                 _, loss = sess.run([optimizer, model.loss], feed_dict=feed_dict)
                 print(loss)
 
+            if i % 30 == 0:
+                print('[epoch %d] predicting...' % i)
+                init_char = 'b'
+                pred = model.predict(sess, char_to_idx[init_char], 200, seq_len, idx_to_char)
+                print("".join(pred))
+
         print('predicting...')
         init_char = 'b'
-        pred = model.predict(sess, char_to_idx[init_char], 400, seq_len, idx_to_char)
+        pred = model.predict(sess, char_to_idx[init_char], 200, seq_len, idx_to_char)
         print("".join(pred))
