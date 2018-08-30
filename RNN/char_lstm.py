@@ -1,5 +1,9 @@
+#!/usr/bin/env python
+
 import tensorflow as tf
 import numpy as np
+import os
+import argparse
 
 class LSTM:
     def __init__(self, num_units, num_layers, seq_len, batch_size, vocab_size):
@@ -87,18 +91,25 @@ def next_batch(sample, batch_size, seq_len, char_to_idx):
 
         yield np.reshape(inputs, [-1, seq_len, vocab_len]), np.reshape(targets, [-1, vocab_len])
 
-if __name__ == '__main__':
-    with open('input.txt', 'r') as input:
+def main(input_file_name, 
+         output_file_name,
+         job_dir, 
+         batch_size, 
+         seq_len, 
+         num_units, 
+         num_layers, 
+         learning_rate, 
+         num_epoches,
+         check_point):
+    input_file = os.path.join(job_dir, input_file_name)
+    with open(input_file, 'r') as input:
         sample = list(input.read())
 
+    output_file = os.path.join(job_dir, output_file_name)
+    output = open(output_file, 'w')
+
     char_to_idx, idx_to_char = build_dataset(sample)
-    batch_size = 128
-    seq_len = 100
-    num_units = 1024
-    num_layers = 1
     model = LSTM(num_units, num_layers, seq_len, batch_size, len(char_to_idx))
-    learning_rate = 1e-4
-    num_epoches = 1000
     optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(model.loss)
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
@@ -117,13 +128,91 @@ if __name__ == '__main__':
                 _, loss = sess.run([optimizer, model.loss], feed_dict=feed_dict)
                 print(loss)
 
-            if i % 30 == 0:
-                print('[epoch %d] predicting...' % i)
+            if i != 0 and i % check_point == 0:
+                output.write('[epoch %d] predicting...' % i)
                 init_char = 'b'
                 pred = model.predict(sess, char_to_idx[init_char], 200, seq_len, idx_to_char)
-                print("".join(pred))
+                output.write("".join(pred))
+                output.write("\n")
 
         print('predicting...')
         init_char = 'b'
         pred = model.predict(sess, char_to_idx[init_char], 200, seq_len, idx_to_char)
-        print("".join(pred))
+        output.write("".join(pred))
+        output.write("\n")
+
+    output.close()
+
+def parse_params(args_parser):
+    args_parser.add_argument(
+        '--job-dir',
+        required=True
+    )
+
+    args_parser.add_argument(
+        '--train-file',
+        required=True
+    )
+
+    args_parser.add_argument(
+        '--output-file',
+        required=True
+    )
+
+    args_parser.add_argument(
+        '--batch-size',
+        type=int,
+        required=True
+    )
+
+    args_parser.add_argument(
+        '--seq-len',
+        type=int,
+        required=True
+    )
+
+    args_parser.add_argument(
+        '--num-units',
+        type=int,
+        required=True
+    )
+
+    args_parser.add_argument(
+        '--num-layers',
+        type=int,
+        required=True,
+    )
+
+    args_parser.add_argument(
+        '--num-epoches',
+        type=int,
+        required=True
+    )
+
+    args_parser.add_argument(
+        '--check-point',
+        type=int,
+        required=True
+    )
+
+    args_parser.add_argument(
+        '--learning-rate',
+        type=float,
+        default=1e-4,
+    )
+
+    return args_parser.parse_args()
+
+if __name__ == '__main__':
+    args_parser = argparse.ArgumentParser()
+    paras = parse_params(args_parser)
+    main(paras.train_file, 
+         paras.output_file,
+         paras.job_dir, 
+         paras.batch_size, 
+         paras.seq_len,
+         paras.num_units,
+         paras.num_layers,
+         paras.learning_rate,
+         paras.num_epoches,
+         paras.check_point)
