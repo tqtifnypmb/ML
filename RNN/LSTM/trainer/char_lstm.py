@@ -142,7 +142,7 @@ def main(input_file_name,
                     pred = model.predict(sess, char_to_idx[init_char], 200, seq_len, idx_to_char)
                 output.write("".join(pred))
                 output.write("\n")
-                print(pred)
+                print("".join(pred))
 
         print('predicting...')
         init_char = 'b'
@@ -150,7 +150,7 @@ def main(input_file_name,
             pred = model.predict(sess, char_to_idx[init_char], 200, seq_len, idx_to_char)
         output.write("".join(pred))
         output.write("\n")
-        print(pred)
+        print("".join(pred))
 
     output.close()
 
