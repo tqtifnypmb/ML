@@ -16,7 +16,7 @@ class LSTM:
         else:
             self.cell = self._build_cell(num_units)
 
-        hidden_state, _ = tf.nn.dynamic_rnn(self.cell, self.inputs, dtype=tf.float32)
+        hidden_state, self.final_state = tf.nn.dynamic_rnn(self.cell, self.inputs, dtype=tf.float32)
         hidden_state = tf.unstack(hidden_state, seq_len, 1)
        
         self.weights = tf.Variable(tf.random_normal([num_units, vocab_size]))
@@ -33,7 +33,7 @@ class LSTM:
 
     def predict(self, sess, init_value, output_len, seq_len, idx_to_char):
         vocab_len = len(idx_to_char)
-        cur_state = self.cell.zero_state(1, tf.float32)
+        cur_state = self.final_state
 
         value = tf.placeholder(tf.float32, [None, vocab_len], name='pred_value')
       
