@@ -4,6 +4,7 @@ import tensorflow as tf
 import numpy as np
 import os
 import argparse
+from tensorflow.python.lib.io import file_io
 
 class LSTM:
     def __init__(self, num_units, num_layers, seq_len, batch_size, vocab_size):
@@ -101,17 +102,20 @@ def main(input_file_name,
          learning_rate, 
          num_epoches,
          check_point):
-    with open(input_file_name, 'r') as input:
+
+    with file_io.FileIO(input_file_name, 'r') as input:
         sample = list(input.read())
 
     output_file = os.path.join(job_dir, output_file_name)
-    output = open(output_file, 'w')
+    output = file_io.FileIO(output_file, 'w') #open(output_file, 'w')
 
     char_to_idx, idx_to_char = build_dataset(sample)
 
     # use gpu
-    #with tf.device('/device:GPU:0'):
-    model = LSTM(num_units, num_layers, seq_len, batch_size, len(char_to_idx))
+    device_name = '/device:GPU:0'
+
+    with tf.device(device_name):
+        model = LSTM(num_units, num_layers, seq_len, batch_size, len(char_to_idx))
 
     optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(model.loss)
     with tf.Session() as sess:
@@ -132,15 +136,17 @@ def main(input_file_name,
                 print(loss)
 
             if i != 0 and i % check_point == 0:
-                output.write('[epoch %d] predicting...' % i)
+                output.write('[epoch %d] predicting...\n' % i)
                 init_char = 'b'
-                pred = model.predict(sess, char_to_idx[init_char], 200, seq_len, idx_to_char)
+                with tf.device(device_name):
+                    pred = model.predict(sess, char_to_idx[init_char], 200, seq_len, idx_to_char)
                 output.write("".join(pred))
                 output.write("\n")
 
         print('predicting...')
         init_char = 'b'
-        pred = model.predict(sess, char_to_idx[init_char], 200, seq_len, idx_to_char)
+        with tf.device(device_name):
+            pred = model.predict(sess, char_to_idx[init_char], 200, seq_len, idx_to_char)
         output.write("".join(pred))
         output.write("\n")
 
