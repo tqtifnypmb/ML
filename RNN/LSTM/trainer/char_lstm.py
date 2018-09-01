@@ -10,13 +10,15 @@ class LSTM:
     def __init__(self, num_units, num_layers, seq_len, batch_size, vocab_size):
         self.inputs = tf.placeholder(tf.float32, [None, seq_len, vocab_size], name='inputs')
         self.targets = tf.placeholder(tf.float32, [None, vocab_size], name='targets')
-
+        
         if num_layers > 1:
             self.cell = tf.nn.rnn_cell.MultiRNNCell([self._build_cell(num_units) for _ in range(num_layers)])
         else:
             self.cell = self._build_cell(num_units)
 
-        hidden_state, self.final_state = tf.nn.dynamic_rnn(self.cell, self.inputs, dtype=tf.float32)
+        initial_states = self._build_state_variables(self.cell, batch_size)
+
+        hidden_state, final_state = tf.nn.dynamic_rnn(self.cell, self.inputs, initial_state=initial_states)
         hidden_state = tf.unstack(hidden_state, seq_len, 1)
        
         self.weights = tf.Variable(tf.random_normal([num_units, vocab_size]))
@@ -26,14 +28,34 @@ class LSTM:
         batch_loss = tf.nn.softmax_cross_entropy_with_logits_v2(logits=Y, labels=self.targets)
         self.loss = tf.reduce_mean(batch_loss)
 
+        self.update_state = self._state_variables_update_op(initial_states, final_state)
+
     def _build_cell(self, num_units):
         cell = tf.nn.rnn_cell.BasicLSTMCell(num_units)
         cell = tf.nn.rnn_cell.DropoutWrapper(cell, output_keep_prob=0.5)
         return cell
 
+    def _build_state_variables(self, cell, batch_size):
+        variables = []
+        for c, h in cell.zero_state(batch_size, tf.float32):
+            c_var = tf.Variable(c, trainable=False)
+            h_var = tf.Variable(h, trainable=False)
+            lstm_tuple = tf.nn.rnn_cell.LSTMStateTuple(c_var, h_var)
+            variables.append(lstm_tuple)
+        return tuple(variables)
+
+    def _state_variables_update_op(self, old_states, new_states):
+        update_ops = []
+        for old_state, new_state in zip(old_states, new_states):
+            update_c = tf.assign(old_state.c, new_state.c)
+            update_h = tf.assign(old_state.h, new_state.h)
+            update_ops.append(update_c)
+            update_ops.append(update_h)
+        return update_ops
+
     def predict(self, sess, init_value, output_len, seq_len, idx_to_char):
         vocab_len = len(idx_to_char)
-        cur_state = self.final_state
+        cur_state = self.cell.zero_state(1, tf.float32) #self.final_state
 
         value = tf.placeholder(tf.float32, [None, vocab_len], name='pred_value')
       
@@ -101,7 +123,9 @@ def main(input_file_name,
          num_layers, 
          learning_rate, 
          num_epoches,
-         check_point):
+         check_point,
+         output_len,
+         use_gpu):
 
     with file_io.FileIO(input_file_name, 'r') as input:
         sample = list(input.read())
@@ -113,6 +137,8 @@ def main(input_file_name,
 
     # use gpu
     device_name = '/device:GPU:0'
+    if use_gpu != 1:
+        device_name = '/cpu:0'
 
     with tf.device(device_name):
         model = LSTM(num_units, num_layers, seq_len, batch_size, len(char_to_idx))
@@ -132,24 +158,24 @@ def main(input_file_name,
                     model.targets: targets
                 }
 
-                _, loss = sess.run([optimizer, model.loss], feed_dict=feed_dict)
+                _, _, loss = sess.run([optimizer, model.update_state, model.loss], feed_dict=feed_dict)
                 print(loss)
 
             if i != 0 and i % check_point == 0:
                 output.write('[epoch %d] predicting...\n' % i)
                 init_char = 'b'
                 with tf.device(device_name):
-                    pred = model.predict(sess, char_to_idx[init_char], 200, seq_len, idx_to_char)
+                    pred = model.predict(sess, char_to_idx[init_char], output_len, seq_len, idx_to_char)
                 output.write("".join(pred))
-                output.write("\n")
+                output.write("\n\n")
                 print("".join(pred))
 
-        print('predicting...')
+        print('predicting...\n')
         init_char = 'b'
         with tf.device(device_name):
-            pred = model.predict(sess, char_to_idx[init_char], 200, seq_len, idx_to_char)
+            pred = model.predict(sess, char_to_idx[init_char], output_len, seq_len, idx_to_char)
         output.write("".join(pred))
-        output.write("\n")
+        output.write("\n\n")
         print("".join(pred))
 
     output.close()
@@ -212,6 +238,18 @@ def parse_params(args_parser):
         default=1e-4,
     )
 
+    args_parser.add_argument(
+        '--use-gpu',
+        type=int,
+        default=1
+    )
+
+    args_parser.add_argument(
+        '--output-len',
+        type=int,
+        default=200
+    )
+
     return args_parser.parse_args()
 
 if __name__ == '__main__':
@@ -226,4 +264,6 @@ if __name__ == '__main__':
          paras.num_layers,
          paras.learning_rate,
          paras.num_epoches,
-         paras.check_point)
+         paras.check_point,
+         paras.output_len,
+         paras.use_gpu)
