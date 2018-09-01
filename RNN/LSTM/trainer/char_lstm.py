@@ -30,6 +30,9 @@ class LSTM:
 
         self.update_state = self._state_variables_update_op(initial_states, final_state)
 
+        zero_state = self._build_state_variables(self.cell, batch_size)
+        self.reset_state = self._state_variables_update_op(initial_states, zero_state)
+
     def _build_cell(self, num_units):
         cell = tf.nn.rnn_cell.BasicLSTMCell(num_units)
         cell = tf.nn.rnn_cell.DropoutWrapper(cell, output_keep_prob=0.5)
@@ -87,7 +90,7 @@ class LSTM:
             pred.append(char)
 
         return pred
-            
+
 def build_dataset(sample):
     unique_chars = list(set(sample))
     char_to_idx = { ch : i for i, ch in enumerate(unique_chars)}
@@ -140,12 +143,16 @@ def main(input_file_name,
     if use_gpu != 1:
         device_name = '/cpu:0'
 
+    vocab_len = len(char_to_idx)
     with tf.device(device_name):
-        model = LSTM(num_units, num_layers, seq_len, batch_size, len(char_to_idx))
+        model = LSTM(num_units, num_layers, seq_len, batch_size, vocab_len)
 
     optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(model.loss)
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
+
+        dump_inputs = np.zeros([1, seq_len, vocab_len])
+        dump_targets = np.zeros([1, vocab_len])
 
         print('training...')
         for i in range(num_epoches):
@@ -169,6 +176,12 @@ def main(input_file_name,
                 output.write("".join(pred))
                 output.write("\n\n")
                 print("".join(pred))
+
+            # reset state
+            sess.run([model.reset_state], feed_dict= {
+                model.inputs: dump_inputs,
+                model.targets: dump_targets
+            })
 
         print('predicting...\n')
         init_char = 'b'
