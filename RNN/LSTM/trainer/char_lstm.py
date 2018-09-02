@@ -9,8 +9,9 @@ from tensorflow.python.lib.io import file_io
 class LSTM:
     def __init__(self, num_units, num_layers, seq_len, batch_size, vocab_size):
         self.inputs = tf.placeholder(tf.float32, [None, seq_len, vocab_size], name='inputs')
-        self.targets = tf.placeholder(tf.float32, [None, vocab_size], name='targets')
-        
+        self.targets = tf.placeholder(tf.float32, [None, seq_len, vocab_size], name='targets')
+        labels = tf.unstack(self.targets, seq_len, 1)
+
         if num_layers > 1:
             self.cell = tf.nn.rnn_cell.MultiRNNCell([self._build_cell(num_units) for _ in range(num_layers)])
         else:
@@ -25,7 +26,7 @@ class LSTM:
         self.bias = tf.Variable(tf.random_normal([vocab_size]))
 
         Y = tf.matmul(hidden_state[-1], self.weights) + self.bias
-        batch_loss = tf.nn.softmax_cross_entropy_with_logits_v2(logits=Y, labels=self.targets)
+        batch_loss = tf.nn.softmax_cross_entropy_with_logits_v2(logits=Y, labels=labels)
         self.loss = tf.reduce_mean(batch_loss)
 
         self.update_state = self._state_variables_update_op(initial_states, final_state)
@@ -76,7 +77,7 @@ class LSTM:
             
             feed_dict = {
                 self.inputs: np.zeros([1, seq_len, vocab_len]),
-                self.targets: np.zeros([1, vocab_len]),
+                self.targets: np.zeros([1, seq_len, vocab_len]),
                 value: cur_value.reshape(-1, vocab_len)
             }
 
@@ -105,23 +106,24 @@ def next_batch(sample, batch_size, seq_len, char_to_idx):
         value[char_to_idx[ch]] = 1
         return value
 
-    batch_len = batch_size * seq_len
-    num_batch = int(len(sample) / batch_len)
-    for i in range(num_batch):
-        p = i * batch_len
-        if p + batch_len + 1 >= len(sample):
-            raise StopIteration()
-
-        inputs = np.asarray([one_hot_encode(ch) for ch in sample[p: p + batch_len]])
-        targets = np.asarray([one_hot_encode(ch) for ch in sample[p + seq_len + 1: p + batch_len + 2: seq_len]])
-
-        yield np.reshape(inputs, [-1, seq_len, vocab_len]), np.reshape(targets, [-1, vocab_len])
+    cur_idx = 0
+    for _ in range(len(sample)):
+        x = np.zeros([batch_size, seq_len, vocab_len])
+        y = np.zeros([batch_size, seq_len, vocab_len])
+        for i in range(batch_size):
+            if cur_idx + seq_len >= len(sample):
+                cur_idx = 0
+           
+            x[i, :, :] = [one_hot_encode(ch) for ch in sample[cur_idx: cur_idx + seq_len]]
+            y[i, :, :] = [one_hot_encode(ch) for ch in sample[cur_idx + 1: cur_idx + seq_len + 1]]
+            cur_idx += 1
+        
+        yield x, y
 
 def main(input_file_name, 
          output_file_name,
          job_dir, 
          batch_size, 
-         seq_len, 
          num_units, 
          num_layers, 
          learning_rate, 
@@ -133,8 +135,9 @@ def main(input_file_name,
     with file_io.FileIO(input_file_name, 'r') as input:
         sample = list(input.read())
 
+    seq_len = 1
     output_file = os.path.join(job_dir, output_file_name)
-    output = file_io.FileIO(output_file, 'w') #open(output_file, 'w')
+    output = file_io.FileIO(output_file, 'w')
 
     char_to_idx, idx_to_char = build_dataset(sample)
 
@@ -152,7 +155,7 @@ def main(input_file_name,
         sess.run(tf.global_variables_initializer())
 
         dump_inputs = np.zeros([1, seq_len, vocab_len])
-        dump_targets = np.zeros([1, vocab_len])
+        dump_targets = np.zeros([1, seq_len, vocab_len])
 
         print('training...')
         for i in range(num_epoches):
@@ -216,12 +219,6 @@ def parse_params(args_parser):
     )
 
     args_parser.add_argument(
-        '--seq-len',
-        type=int,
-        required=True
-    )
-
-    args_parser.add_argument(
         '--num-units',
         type=int,
         required=True
@@ -272,7 +269,6 @@ if __name__ == '__main__':
          paras.output_file,
          paras.job_dir, 
          paras.batch_size, 
-         paras.seq_len,
          paras.num_units,
          paras.num_layers,
          paras.learning_rate,
