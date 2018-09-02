@@ -106,18 +106,21 @@ def next_batch(sample, batch_size, seq_len, char_to_idx):
         value[char_to_idx[ch]] = 1
         return value
 
+    num_batch = int(len(sample) / (seq_len * batch_size))
     cur_idx = 0
-    for _ in range(len(sample)):
+    for batch_idx in range(num_batch):
         x = np.zeros([batch_size, seq_len, vocab_len])
         y = np.zeros([batch_size, seq_len, vocab_len])
-        for i in range(batch_size):
-            if cur_idx + seq_len >= len(sample):
-                cur_idx = 0
-           
-            x[i, :, :] = [one_hot_encode(ch) for ch in sample[cur_idx: cur_idx + seq_len]]
-            y[i, :, :] = [one_hot_encode(ch) for ch in sample[cur_idx + 1: cur_idx + seq_len + 1]]
-            cur_idx += 1
         
+        for i in range(batch_size):
+            offset = batch_idx * batch_size
+            if cur_idx + offset + seq_len >= len(sample):
+                raise StopIteration()
+
+            x[i, :, :] = [one_hot_encode(ch) for ch in sample[cur_idx + offset: cur_idx + offset + seq_len]]
+            y[i, :, :] = [one_hot_encode(ch) for ch in sample[cur_idx + offset + 1: cur_idx + offset + seq_len + 1]]
+            cur_idx += seq_len
+
         yield x, y
 
 def main(input_file_name, 
