@@ -41,21 +41,33 @@ class LSTM:
         return cell
 
     def _build_state_variables(self, cell, batch_size):
-        variables = []
-        for c, h in cell.zero_state(batch_size, tf.float32):
-            c_var = tf.Variable(c, trainable=False)
-            h_var = tf.Variable(h, trainable=False)
-            lstm_tuple = tf.nn.rnn_cell.LSTMStateTuple(c_var, h_var)
-            variables.append(lstm_tuple)
-        return tuple(variables)
+        zero_states = cell.zero_state(batch_size, tf.float32)
+        if type(zero_states) is tf.nn.rnn_cell.LSTMStateTuple:
+            c_var = tf.Variable(zero_states.c, trainable=False)
+            h_var = tf.Variable(zero_states.h, trainable=False)
+            return tf.nn.rnn_cell.LSTMStateTuple(c_var, h_var)
+        else:
+            variables = []
+            for c, h in cell.zero_state(batch_size, tf.float32):
+                c_var = tf.Variable(c, trainable=False)
+                h_var = tf.Variable(h, trainable=False)
+                lstm_tuple = tf.nn.rnn_cell.LSTMStateTuple(c_var, h_var)
+                variables.append(lstm_tuple)
+            return tuple(variables)
 
     def _state_variables_update_op(self, old_states, new_states):
         update_ops = []
-        for old_state, new_state in zip(old_states, new_states):
-            update_c = tf.assign(old_state.c, new_state.c)
-            update_h = tf.assign(old_state.h, new_state.h)
+        if type(new_states) is tf.nn.rnn_cell.LSTMStateTuple:
+            update_c = tf.assign(old_states.c, new_states.c)
+            update_h = tf.assign(old_states.h, new_states.h)
             update_ops.append(update_c)
             update_ops.append(update_h)
+        else:
+            for old_state, new_state in zip(old_states, new_states):
+                update_c = tf.assign(old_state.c, new_state.c)
+                update_h = tf.assign(old_state.h, new_state.h)
+                update_ops.append(update_c)
+                update_ops.append(update_h)
         return update_ops
 
     def predict(self, sess, init_value, output_len, seq_len, idx_to_char):
@@ -84,7 +96,7 @@ class LSTM:
             }
 
             py = sess.run([Y], feed_dict=feed_dict)
-            idx = np.argmax(py)
+            idx = np.argmax(py[-1])
      
             cur_value = np.zeros_like(cur_value)
             cur_value[idx] = 1
@@ -109,21 +121,20 @@ def next_batch(sample, batch_size, seq_len, char_to_idx):
         return value
 
     num_batch = int(len(sample) / (seq_len * batch_size))
-    cur_idx = 0
     for batch_idx in range(num_batch):
         x = np.zeros([batch_size, seq_len, vocab_len])
         y = np.zeros([batch_size, seq_len, vocab_len])
         
+        offset = batch_idx * batch_size
+        cur_idx = 0
         for i in range(batch_size):
-            offset = batch_idx * batch_size
             if cur_idx + offset + seq_len >= len(sample):
                 raise StopIteration()
 
             x[i, :, :] = [one_hot_encode(ch) for ch in sample[cur_idx + offset: cur_idx + offset + seq_len]]
             y[i, :, :] = [one_hot_encode(ch) for ch in sample[cur_idx + offset + 1: cur_idx + offset + seq_len + 1]]
-            cur_idx += seq_len
 
-            print(sample[cur_idx + offset: cur_idx + offset + seq_len])
+            cur_idx += seq_len
 
         yield x, y
 
@@ -170,8 +181,6 @@ def main(input_file_name,
             print('epoch: %d' % i)
             print('===============')
             for inputs, targets in next_batch(sample, batch_size, seq_len, char_to_idx):
-                #continue
-
                 feed_dict = {
                     model.inputs: inputs,
                     model.targets: targets
