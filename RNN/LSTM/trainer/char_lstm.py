@@ -20,6 +20,7 @@ class LSTM:
         initial_states = self._build_state_variables(self.cell, batch_size)
 
         hidden_state, final_state = tf.nn.dynamic_rnn(self.cell, self.inputs, initial_state=initial_states)
+
         hidden_state = tf.unstack(hidden_state, seq_len, 1)
        
         self.weights = tf.Variable(tf.random_normal([num_units, vocab_size]))
@@ -59,7 +60,8 @@ class LSTM:
 
     def predict(self, sess, init_value, output_len, seq_len, idx_to_char):
         vocab_len = len(idx_to_char)
-        cur_state = self.cell.zero_state(1, tf.float32) #self.final_state
+
+        cur_state = self.cell.zero_state(1, tf.float32)
 
         value = tf.placeholder(tf.float32, [None, vocab_len], name='pred_value')
       
@@ -121,6 +123,8 @@ def next_batch(sample, batch_size, seq_len, char_to_idx):
             y[i, :, :] = [one_hot_encode(ch) for ch in sample[cur_idx + offset + 1: cur_idx + offset + seq_len + 1]]
             cur_idx += seq_len
 
+            print(sample[cur_idx + offset: cur_idx + offset + seq_len])
+
         yield x, y
 
 def main(input_file_name, 
@@ -166,6 +170,8 @@ def main(input_file_name,
             print('epoch: %d' % i)
             print('===============')
             for inputs, targets in next_batch(sample, batch_size, seq_len, char_to_idx):
+                #continue
+
                 feed_dict = {
                     model.inputs: inputs,
                     model.targets: targets
