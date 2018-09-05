@@ -10,8 +10,7 @@ class LSTM:
     def __init__(self, num_units, num_layers, seq_len, batch_size, vocab_size):
         self.batch_size = batch_size
         self.inputs = tf.placeholder(tf.float32, [None, seq_len, vocab_size], name='inputs')
-        self.targets = tf.placeholder(tf.float32, [None, seq_len, vocab_size], name='targets')
-        labels = tf.unstack(self.targets, seq_len, 1)
+        self.targets = tf.placeholder(tf.int32, [batch_size], name='targets')
 
         if num_layers > 1:
             self.cell = tf.nn.rnn_cell.MultiRNNCell([self._build_cell(num_units) for _ in range(num_layers)])
@@ -29,7 +28,7 @@ class LSTM:
         self.bias = tf.Variable(tf.random_normal([vocab_size]))
 
         self.output = tf.matmul(hidden_state[-1], self.weights) + self.bias
-        batch_loss = tf.nn.softmax_cross_entropy_with_logits_v2(logits=self.output, labels=labels)
+        batch_loss = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=self.output, labels=self.targets)
         self.loss = tf.reduce_mean(batch_loss)
 
         # self.update_state = self._state_variables_update_op(initial_states, final_state)
@@ -117,7 +116,7 @@ def next_batch(sample, batch_size, seq_len, char_to_idx):
     num_batch = int(len(sample) / (seq_len * batch_size))
     for batch_idx in range(num_batch):
         x = np.zeros([batch_size, seq_len, vocab_len])
-        y = np.zeros([batch_size, seq_len, vocab_len])
+        y = np.zeros([batch_size])
         
         offset = batch_idx * batch_size
         cur_idx = 0
@@ -126,7 +125,7 @@ def next_batch(sample, batch_size, seq_len, char_to_idx):
                 raise StopIteration()
 
             x[i, :, :] = [one_hot_encode(ch) for ch in sample[cur_idx + offset: cur_idx + offset + seq_len]]
-            y[i, :, :] = [one_hot_encode(ch) for ch in sample[cur_idx + offset + 1: cur_idx + offset + seq_len + 1]]
+            y[i] = char_to_idx[sample[cur_idx + offset + 1]]
 
             cur_idx += seq_len
 
