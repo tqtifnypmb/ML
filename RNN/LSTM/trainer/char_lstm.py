@@ -27,9 +27,11 @@ class LSTM:
         self.weights = tf.Variable(tf.random_normal([num_units, vocab_size]))
         self.bias = tf.Variable(tf.random_normal([vocab_size]))
 
-        self.output = tf.matmul(hidden_state[-1], self.weights) + self.bias
-        batch_loss = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=self.output, labels=self.targets)
+        output = tf.matmul(hidden_state[-1], self.weights) + self.bias
+        batch_loss = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=output, labels=self.targets)
+
         self.loss = tf.reduce_mean(batch_loss)
+        self.pred = tf.nn.softmax(output)
 
         # self.update_state = self._state_variables_update_op(initial_states, final_state)
 
@@ -74,6 +76,7 @@ class LSTM:
     def predict(self, sess, init_value, output_len, seq_len, idx_to_char):
         cur_state = sess.run(self.cell.zero_state(self.batch_size, tf.float32))
       
+        voab_size = len(idx_to_char)
         prev = init_value
         pred = []
         for i in range(output_len):
@@ -84,10 +87,10 @@ class LSTM:
                 self.initial_states: cur_state,
             }
 
-            py, state = sess.run([self.output, self.final_state], feed_dict=feed_dict)
+            py, state = sess.run([self.pred, self.final_state], feed_dict=feed_dict)
             cur_state = state
 
-            idx = np.argmax(py[-1])
+            idx = np.random.choice(range(voab_size), p=py[-1])
             prev[0: len(prev) - 1] = prev[1: len(prev)]
 
             value = np.zeros_like(prev[-1][0])
