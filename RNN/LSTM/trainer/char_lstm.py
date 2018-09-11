@@ -19,8 +19,6 @@ class LSTM:
 
         self.initial_states = self.cell.zero_state(batch_size, tf.float32)
 
-        # initial_states = self._build_state_variables(self.cell, batch_size)
-
         hidden_state, self.final_state = tf.nn.dynamic_rnn(self.cell, self.inputs, initial_state=self.initial_states)
         hidden_state = tf.unstack(hidden_state, seq_len, 1)
        
@@ -33,45 +31,10 @@ class LSTM:
         self.loss = tf.reduce_mean(batch_loss)
         self.pred = tf.nn.softmax(output)
 
-        # self.update_state = self._state_variables_update_op(initial_states, final_state)
-
-        # zero_state = self._build_state_variables(self.cell, batch_size)
-        # self.reset_state = self._state_variables_update_op(initial_states, zero_state)
-
     def _build_cell(self, num_units):
         cell = tf.nn.rnn_cell.BasicLSTMCell(num_units)
         cell = tf.nn.rnn_cell.DropoutWrapper(cell, output_keep_prob=0.5)
         return cell
-
-    def _build_state_variables(self, cell, batch_size):
-        zero_states = cell.zero_state(batch_size, tf.float32)
-        if type(zero_states) is tf.nn.rnn_cell.LSTMStateTuple:
-            c_var = tf.Variable(zero_states.c, trainable=False)
-            h_var = tf.Variable(zero_states.h, trainable=False)
-            return tf.nn.rnn_cell.LSTMStateTuple(c_var, h_var)
-        else:
-            variables = []
-            for c, h in cell.zero_state(batch_size, tf.float32):
-                c_var = tf.Variable(c, trainable=False)
-                h_var = tf.Variable(h, trainable=False)
-                lstm_tuple = tf.nn.rnn_cell.LSTMStateTuple(c_var, h_var)
-                variables.append(lstm_tuple)
-            return tuple(variables)
-
-    def _state_variables_update_op(self, old_states, new_states):
-        update_ops = []
-        if type(new_states) is tf.nn.rnn_cell.LSTMStateTuple:
-            update_c = tf.assign(old_states.c, new_states.c)
-            update_h = tf.assign(old_states.h, new_states.h)
-            update_ops.append(update_c)
-            update_ops.append(update_h)
-        else:
-            for old_state, new_state in zip(old_states, new_states):
-                update_c = tf.assign(old_state.c, new_state.c)
-                update_h = tf.assign(old_state.h, new_state.h)
-                update_ops.append(update_c)
-                update_ops.append(update_h)
-        return update_ops
 
     def predict(self, sess, init_value, output_len, seq_len, idx_to_char):
         cur_state = sess.run(self.cell.zero_state(self.batch_size, tf.float32))

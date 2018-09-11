@@ -2,7 +2,9 @@
 
 from tensorflow import keras
 from tensorflow.python.lib.io import file_io
+
 import numpy as np
+import argparse
 import os
 
 class Keras_LSTM:
@@ -30,10 +32,8 @@ class Keras_LSTM:
 
     def predict(self, init_char):
         pred = self.model.predict(init_char)
-        pred = pred[:, -1, :]
-        pred = np.squeeze(pred)
-        
-        idx = np.argmax(pred)
+        pred = np.squeeze(pred) 
+        idx = np.argmax(pred[0])
         return idx
 
 def build_dataset(sample):
@@ -50,56 +50,150 @@ def next_batch(sample, batch_size, seq_len, char_to_idx):
         value[char_to_idx[ch]] = 1
         return value
 
-    cur_idx = 0
-    for _ in range(len(sample)):
+    num_batch = int(len(sample) / (seq_len * batch_size))
+    for batch_idx in range(num_batch):
         x = np.zeros([batch_size, seq_len])
         y = np.zeros([batch_size, seq_len, vocab_len])
+        
+        offset = batch_idx * batch_size
+        cur_idx = 0
         for i in range(batch_size):
-            if cur_idx + seq_len >= len(sample):
-                cur_idx = 0
+            if cur_idx + offset + seq_len >= len(sample):
+                raise StopIteration()
 
-            x[i, :] = [char_to_idx[ch] for ch in sample[cur_idx: cur_idx + seq_len]]
-            y[i, :, :] = [one_hot_encode(ch) for ch in sample[cur_idx + 1: cur_idx + seq_len + 1]]
-            cur_idx += 1
+            x[i, :] = [char_to_idx[ch] for ch in sample[cur_idx + offset: cur_idx + offset + seq_len]]
+            y[i, :, :] = [one_hot_encode(ch) for ch in sample[cur_idx + offset + 1: cur_idx + offset + seq_len + 1]]
+
+            cur_idx += seq_len
 
         yield x, y
         
-if __name__ == '__main__':
-    with file_io.FileIO('../LSTM/data/sample_short.txt', 'r') as input:
+def main(batch_size,
+         seq_len,
+         num_epoches,
+         num_units,
+         num_layers,
+         job_dir,
+         input_file,
+         output_file,
+         output_len,
+         check_point):
+    with file_io.FileIO(input_file, 'r') as input:
         sample = list(input.read())
 
-    output_file = os.path.join('.', 'output_file_name.txt')
-    output = file_io.FileIO(output_file, 'w')
+    output_file_name = os.path.join(job_dir, output_file)
+    output = file_io.FileIO(output_file_name, 'w')
 
     char_to_idx, idx_to_char = build_dataset(sample)
-    
-    batch_size = 5
-    num_epoches = 1
-    seq_len =30
-    num_units = 256
-    num_layers = 2
     vocab_size = len(char_to_idx)
 
     model = Keras_LSTM(num_units, num_layers, batch_size, seq_len, vocab_size)
 
     for epoch in range(num_epoches):
-
         for inputs, targets in next_batch(sample, batch_size, seq_len, char_to_idx):
             model.fit(inputs, targets)
-
         model.reset_states()
 
-    num_pred = 50
+        if epoch % check_point == 0 and epoch != 0:
+            init_char = char_to_idx['b']
+            pred_words = []
+            output.write('[epoch %d] predicting...\n' % epoch)
+            for _ in range(output_len):
+                input = np.array([init_char])
+                input = np.reshape(input, [-1, 1])
+                pred = model.predict(input)
+                pred_words.append(idx_to_char[pred])
+                init_char = pred
+            pred_str = "".join(pred_words)
+            print("pred words: " + pred_str)
+            output.write(pred_str)
+            output.write("\n\n")
+
+    init_char = char_to_idx['b']
     pred_words = []
-
-    pred_idx = 0
-    for inputs, _ in next_batch(sample, 1, seq_len, char_to_idx):
-        pred = model.predict(inputs)
-        pred_words.append(idx_to_char[pred])   
-
-        pred_idx += 1
-        if (pred_idx > num_pred):
-            break
-    
+    for _ in range(output_len):
+        input = np.array([init_char])
+        input = np.reshape(input, [-1, 1])
+        pred = model.predict(input)
+        pred_words.append(idx_to_char[pred])
+        init_char = pred
     pred_str = "".join(pred_words)
     print("pred words: " + pred_str)
+    output.write(pred_str)
+    output.write("\n\n")
+    output.close()
+
+
+def parse_params(args_parser):
+    args_parser.add_argument(
+        '--job-dir',
+        required=True
+    )
+
+    args_parser.add_argument(
+        '--input-file',
+        required=True
+    )
+
+    args_parser.add_argument(
+        '--output-file',
+        required=True
+    )
+
+    args_parser.add_argument(
+        '--batch-size',
+        type=int,
+        required=True
+    )
+
+    args_parser.add_argument(
+        '--num-units',
+        type=int,
+        required=True
+    )
+
+    args_parser.add_argument(
+        '--num-layers',
+        type=int,
+        required=True,
+    )
+
+    args_parser.add_argument(
+        '--num-epoches',
+        type=int,
+        required=True
+    )
+
+    args_parser.add_argument(
+        '--check-point',
+        type=int,
+        required=True
+    )
+
+    args_parser.add_argument(
+        '--output-len',
+        type=int,
+        default=200
+    )
+
+    args_parser.add_argument(
+        '--seq-len',
+        type=int,
+        required=True
+    )
+
+    return args_parser.parse_args()
+
+if __name__ == '__main__':
+    args_parser = argparse.ArgumentParser()
+    paras = parse_params(args_parser)
+    main(paras.batch_size, 
+         paras.seq_len,
+         paras.num_epoches,
+         paras.num_units,
+         paras.num_layers,
+         paras.job_dir,
+         paras.input_file,
+         paras.output_file,
+         paras.output_len,
+         paras.check_point)
