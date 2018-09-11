@@ -24,8 +24,8 @@ class Keras_LSTM:
 
         self.model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['categorical_accuracy'])
         
-    def fit(self, x, y):
-        self.model.fit(x, y)
+    def fit(self, x, y, batch_size):
+        self.model.fit(x, y, batch_size=batch_size,)
 
     def reset_states(self):
         self.model.reset_states()
@@ -91,13 +91,13 @@ def main(batch_size,
 
     for epoch in range(num_epoches):
         for inputs, targets in next_batch(sample, batch_size, seq_len, char_to_idx):
-            model.fit(inputs, targets)
+            model.fit(inputs, targets, batch_size)
         model.reset_states()
 
         if epoch % check_point == 0 and epoch != 0:
             init_char = char_to_idx['b']
             pred_words = []
-            output.write('[epoch %d] predicting...\n' % epoch)
+            print('[epoch %d] predicting...\n' % epoch)
             for _ in range(output_len):
                 input = np.array([init_char])
                 input = np.reshape(input, [-1, 1])
