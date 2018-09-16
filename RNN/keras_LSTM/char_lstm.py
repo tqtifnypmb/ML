@@ -118,7 +118,7 @@ def main(batch_size,
     for epoch in range(num_epoches):
         for inputs, targets in next_batch(sample, batch_size, seq_len, char_to_idx):
             model.fit(inputs, targets, batch_size)
-        model.reset_states()
+        # model.reset_states()
 
         if epoch % check_point == 0 and epoch != 0:
             generator = next_batch(sample, 1, seq_len, char_to_idx)
