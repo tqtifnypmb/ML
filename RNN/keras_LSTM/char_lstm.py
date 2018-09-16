@@ -16,12 +16,13 @@ class Keras_LSTM:
         
         # lstm
         for _ in range(num_layers):
-            self.model.add(keras.layers.LSTM(num_units, dropout=0.5, return_sequences=True))
+            self.model.add(keras.layers.LSTM(num_units, recurrent_dropout=0.5, return_sequences=True))
 
         # output
         self.model.add(keras.layers.TimeDistributed(keras.layers.Dense(vocab_size)))
+        keras.layers.Softmax()
         self.model.add(keras.layers.Activation('softmax'))
-
+        
         self.model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['categorical_accuracy'])
         
     def fit(self, x, y, batch_size):
@@ -32,8 +33,7 @@ class Keras_LSTM:
 
     def predict(self, init_char):
         pred = self.model.predict(init_char)
-        pred = np.squeeze(pred) 
-        idx = np.argmax(pred[0])
+        idx = np.argmax(pred, axis=2)
         return idx
 
 def build_dataset(sample):
@@ -68,6 +68,32 @@ def next_batch(sample, batch_size, seq_len, char_to_idx):
 
         yield x, y
         
+def do_prediction(output_len, idx_to_char, model, sample_generator):
+    initial_sample, _ = next(sample_generator)
+    pred = []
+
+    # idxs = model.predict(initial_sample)[0]
+    # for idx in idxs:
+    #     ch = idx_to_char[idx]
+    #     pred.append(ch)
+
+    next_sample, _ = next(sample_generator)
+    next_sample_idx = 0
+    for _ in range(output_len):
+        if next_sample_idx >= len(next_sample[0]):
+            next_sample, _ = next(sample_generator)
+            next_sample_idx = 0
+
+        idxs = model.predict(initial_sample)[0]
+        initial_sample[0][0:-1] = initial_sample[0][1:]
+        initial_sample[0][-1] = next_sample[0][next_sample_idx]
+        next_sample_idx += 1
+
+        ch = idx_to_char[idxs[0]]
+        pred.append(ch)
+
+    return "".join(pred)
+
 def main(batch_size,
          seq_len,
          num_epoches,
@@ -95,34 +121,18 @@ def main(batch_size,
         model.reset_states()
 
         if epoch % check_point == 0 and epoch != 0:
-            init_char = char_to_idx['b']
-            pred_words = []
-            print('[epoch %d] predicting...\n' % epoch)
-            for _ in range(output_len):
-                input = np.array([init_char])
-                input = np.reshape(input, [-1, 1])
-                pred = model.predict(input)
-                pred_words.append(idx_to_char[pred])
-                init_char = pred
-            pred_str = "".join(pred_words)
+            generator = next_batch(sample, 1, seq_len, char_to_idx)
+            pred_str = do_prediction(output_len, idx_to_char, model, generator)
             print("pred words: " + pred_str)
             output.write(pred_str)
             output.write("\n\n")
 
-    init_char = char_to_idx['b']
-    pred_words = []
-    for _ in range(output_len):
-        input = np.array([init_char])
-        input = np.reshape(input, [-1, 1])
-        pred = model.predict(input)
-        pred_words.append(idx_to_char[pred])
-        init_char = pred
-    pred_str = "".join(pred_words)
+    generator = next_batch(sample, 1, seq_len, char_to_idx)
+    pred_str = do_prediction(output_len, idx_to_char, model, generator)
     print("pred words: " + pred_str)
     output.write(pred_str)
     output.write("\n\n")
     output.close()
-
 
 def parse_params(args_parser):
     args_parser.add_argument(
