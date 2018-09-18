@@ -33,8 +33,7 @@ class Keras_LSTM:
 
     def predict(self, init_char):
         pred = self.model.predict(init_char)
-        idx = np.argmax(pred, axis=2)
-        return idx
+        return pred
 
 def build_dataset(sample):
     unique_chars = list(set(sample))
@@ -71,26 +70,14 @@ def next_batch(sample, batch_size, seq_len, char_to_idx):
 def do_prediction(output_len, idx_to_char, model, sample_generator):
     initial_sample, _ = next(sample_generator)
     pred = []
-
-    # idxs = model.predict(initial_sample)[0]
-    # for idx in idxs:
-    #     ch = idx_to_char[idx]
-    #     pred.append(ch)
-
-    next_sample, _ = next(sample_generator)
-    next_sample_idx = 0
     for _ in range(output_len):
-        if next_sample_idx >= len(next_sample[0]):
-            next_sample, _ = next(sample_generator)
-            next_sample_idx = 0
-
-        idxs = model.predict(initial_sample)[0]
-        initial_sample[0][0:-1] = initial_sample[0][1:]
-        initial_sample[0][-1] = next_sample[0][next_sample_idx]
-        next_sample_idx += 1
-
-        ch = idx_to_char[idxs[0]]
+        idxs = model.predict(initial_sample)
+        idxs = np.squeeze(idxs)
+        sample = np.random.choice(len(idx_to_char), p=idxs[0])
+        ch = idx_to_char[sample]
         pred.append(ch)
+
+        initial_sample[0][0] = sample
 
     return "".join(pred)
 
