@@ -103,6 +103,8 @@ def main(batch_size,
     model = Keras_LSTM(num_units, num_layers, batch_size, seq_len, vocab_size)
 
     for epoch in range(num_epoches):
+        print('========= Epoch %d =========\n' % epoch )
+
         for inputs, targets in next_batch(sample, batch_size, seq_len, char_to_idx):
             model.fit(inputs, targets, batch_size)
         # model.reset_states()
@@ -111,12 +113,16 @@ def main(batch_size,
             generator = next_batch(sample, 1, seq_len, char_to_idx)
             pred_str = do_prediction(output_len, idx_to_char, model, generator)
             print("pred words: " + pred_str)
+            output.write('==============\n')
+            output.write('epoch: %d \n' % epoch)
+            output.write('==============\n')
             output.write(pred_str)
             output.write("\n\n")
 
     generator = next_batch(sample, 1, seq_len, char_to_idx)
     pred_str = do_prediction(output_len, idx_to_char, model, generator)
     print("pred words: " + pred_str)
+    output.write('==============\n')
     output.write(pred_str)
     output.write("\n\n")
     output.close()
