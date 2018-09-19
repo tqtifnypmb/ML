@@ -73,11 +73,12 @@ def do_prediction(output_len, idx_to_char, model, sample_generator):
     for _ in range(output_len):
         idxs = model.predict(initial_sample)
         idxs = np.squeeze(idxs)
-        sample = np.random.choice(len(idx_to_char), p=idxs[0])
+        sample = np.random.choice(len(idx_to_char), p=idxs[-1])
         ch = idx_to_char[sample]
         pred.append(ch)
 
-        initial_sample[0][0] = sample
+        initial_sample[0][0:-1] = initial_sample[0][1:]
+        initial_sample[0][-1] = sample
 
     return "".join(pred)
 
