@@ -3,15 +3,16 @@ import re
 import nltk
 import os
 
+from sklearn import model_selection
 from tensorflow import keras
 from bs4 import BeautifulSoup
 
 def build_mode(vocab_size, num_conv, kernel_size, num_dense, num_units):
     model = keras.Sequential()
 
-    # input embeding
-    embed = keras.layers.Embedding(vocab_size, vocab_size)
-    model.add(embed)
+    # input
+    input = keras.layers.InputLayer(input_shape=(None, vocab_size))
+    model.add(input)
 
     for _ in range(num_conv):
         # convoluntion
@@ -108,6 +109,12 @@ if __name__ == '__main__':
     num_units = 128
     model = build_mode(vocab_size, num_conv, kernel_size, num_dense, num_units)
 
-    x = encode_reviews(train['review'], char_to_idx)
+    # train_x, test_x, train_y, test_y = model_selection.train_test_split(train['review'], 
+    #                                                                     train['sentiment'], 
+    #                                                                     test_size=0.3)
+    
+    x = train['review']
     y = train['sentiment']
     model.fit(x, y, batch_size)
+    # pred = model.predict(test_x, batch_size=batch_size)
+    # print(pred)
