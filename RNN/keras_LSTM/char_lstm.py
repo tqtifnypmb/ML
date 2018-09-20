@@ -16,11 +16,10 @@ class Keras_LSTM:
         
         # lstm
         for _ in range(num_layers):
-            self.model.add(keras.layers.LSTM(num_units, recurrent_dropout=0.5, return_sequences=True))
+            self.model.add(keras.layers.GRU(num_units, recurrent_dropout=0.5, return_sequences=True))
 
         # output
         self.model.add(keras.layers.TimeDistributed(keras.layers.Dense(vocab_size)))
-        keras.layers.Softmax()
         self.model.add(keras.layers.Activation('softmax'))
         
         self.model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['categorical_accuracy'])
