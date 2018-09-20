@@ -109,3 +109,4 @@ uci_data/
 # Data
 *.tsv
 *.csv
+*.model
