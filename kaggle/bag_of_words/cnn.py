@@ -6,6 +6,8 @@ import numpy as np
 
 from gensim.models import word2vec, KeyedVectors
 from sklearn import model_selection
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
 from tensorflow import keras
 from bs4 import BeautifulSoup
 
@@ -111,13 +113,23 @@ def vector_for_sentences(sents, num_features, model):
         X[i][0] = vec
     return X
 
+def vector_for_sentences_forest(sents, num_features, model):
+    X = np.zeros([len(sents), num_features])
+    for i in range(len(sents)):
+        sent = sents[i]
+        vec = vector_for_sentence(sent, num_features, wordModel)
+        X[i] = vec
+    return X
+
 def vector_for_sentence(sent, num_features, model):
     vec = np.zeros([num_features])
+    count = 0
     for word in sent:
-        v = model[word]
-        vec += v
-
-    vec /= len(sent)
+        if word in model:
+            v = model[word]
+            vec += v
+            count += 1
+    vec /= count
     return np.reshape(np.asarray(vec), [1, -1])
 
 data_set = {
@@ -132,14 +144,7 @@ truncated_data_set = {
 
 if __name__ == '__main__':
     data = data_set
-    train = read_data(data['train'])
-    tokenizer = nltk.data.load('tokenizers/punkt/english.pickle')
-
-    num_features = 30
-    wordModel, sents = train_and_save_word2vec(train['review'],
-                                               num_features,
-                                               tokenizer)
-
+    wordModel = KeyedVectors.load_word2vec_format('./google_300_model.bin', binary=True)
     idx_to_word = wordModel.wv.index2word
 
     batch_size = 32
@@ -149,23 +154,28 @@ if __name__ == '__main__':
     num_dense = 2
     num_units = 256
     num_words = 1
-    num_epochs = 50
+    num_epochs = 1
+    num_features = 300
     model = build_mode(vocab_size, num_words, num_features, num_conv, kernel_size, num_dense, num_units)
-
-    X = vector_for_sentences(sents, num_features, wordModel)    
+    forest = RandomForestClassifier(n_estimators=200)
+    train = read_data(data['train'])
+    tokenizer = nltk.data.load('tokenizers/punkt/english.pickle')
+    train_sents = encode_reviews_2(train['review'], tokenizer)
+    X = vector_for_sentences_forest(train_sents, num_features, wordModel)    
     y = train['sentiment']
-    model.fit(X, y, batch_size=batch_size, epochs=num_epochs)
+    # model.fit(X, y, batch_size=batch_size, epochs=num_epochs)
+    forest = forest.fit(X, y)
+    # logistic.fit(X, y)
 
     # test
     test = read_data(data['test'])
     test_sents = encode_reviews_2(test['review'], tokenizer)
-    wordModel.build_vocab(test_sents, update=True)
-    X = vector_for_sentences(test_sents, num_features, wordModel)
-    pred = model.predict(X)
-    pred = np.squeeze(pred)
-    print(pred)
+    X = vector_for_sentences_forest(test_sents, num_features, wordModel)
+    pred = forest.predict(X)
+    # pred = model.predict(X)
+    # pred = np.squeeze(pred)
 
     output = pd.DataFrame(data={"id":test["id"], "sentiment":pred})
-    output['sentiment'] = output['sentiment'] > 0.5
-    output.sentiment = output.sentiment.astype('int')
+    # output['sentiment'] = output['sentiment'] > 0.5
+    # output.sentiment = output.sentiment.astype('int')
     output.to_csv( "Bag_of_Words_model.csv", index=False, quoting=3)
