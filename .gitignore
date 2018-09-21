@@ -110,3 +110,4 @@ uci_data/
 *.tsv
 *.csv
 *.model
+*.bin
