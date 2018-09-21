@@ -11,7 +11,7 @@ from sklearn.ensemble import RandomForestClassifier
 from tensorflow import keras
 from bs4 import BeautifulSoup
 
-def build_mode(vocab_size, num_words, num_features, num_conv, kernel_size, num_dense, num_units):
+def build_mode(num_words, num_features, num_conv, kernel_size, num_dense, num_units):
     model = keras.Sequential()
 
     # input
@@ -105,7 +105,7 @@ def train_and_save_word2vec(raw_reviews, num_features, tokenizer):
     model.init_sims(replace=True)
     return model, sentences
 
-def vector_for_sentences(sents, num_features, model):
+def vector_for_sentences(sents, num_features, wordModel):
     X = np.zeros([len(sents), 1, num_features])
     for i in range(len(sents)):
         sent = sents[i]
@@ -113,7 +113,7 @@ def vector_for_sentences(sents, num_features, model):
         X[i][0] = vec
     return X
 
-def vector_for_sentences_forest(sents, num_features, model):
+def vector_for_sentences_forest(sents, num_features, wordModel):
     X = np.zeros([len(sents), num_features])
     for i in range(len(sents)):
         sent = sents[i]
@@ -142,40 +142,76 @@ truncated_data_set = {
     'test': 'data/testData_truncated.tsv'
 }
 
-if __name__ == '__main__':
-    data = data_set
-    wordModel = KeyedVectors.load_word2vec_format('./google_300_model.bin', binary=True)
-    idx_to_word = wordModel.wv.index2word
-
-    batch_size = 32
-    vocab_size = len(idx_to_word)
-    num_conv = 3
-    kernel_size = 3
-    num_dense = 2
-    num_units = 256
-    num_words = 1
-    num_epochs = 1
-    num_features = 300
-    model = build_mode(vocab_size, num_words, num_features, num_conv, kernel_size, num_dense, num_units)
-    forest = RandomForestClassifier(n_estimators=200)
-    train = read_data(data['train'])
+def word2vec_forest(train, test, num_features, forest, pretrained_word2vec=True):
     tokenizer = nltk.data.load('tokenizers/punkt/english.pickle')
-    train_sents = encode_reviews_2(train['review'], tokenizer)
+
+    wordModel = None
+    train_sents = None
+    if pretrained_word2vec:
+        wordModel = KeyedVectors.load_word2vec_format('./google_300_model.bin', binary=True)
+        train_sents = encode_reviews_2(train['review'], tokenizer)
+    else:
+        wordModel, train_sents = train_and_save_word2vec(train['review'], num_features, tokenizer)
+    
     X = vector_for_sentences_forest(train_sents, num_features, wordModel)    
     y = train['sentiment']
-    # model.fit(X, y, batch_size=batch_size, epochs=num_epochs)
     forest = forest.fit(X, y)
-    # logistic.fit(X, y)
 
-    # test
-    test = read_data(data['test'])
     test_sents = encode_reviews_2(test['review'], tokenizer)
     X = vector_for_sentences_forest(test_sents, num_features, wordModel)
     pred = forest.predict(X)
-    # pred = model.predict(X)
-    # pred = np.squeeze(pred)
+    
+    return pred
+
+def word2vec_cnn(train, test, num_features, model, pretrained_word2vec=True):
+    tokenizer = nltk.data.load('tokenizers/punkt/english.pickle')
+
+    wordModel = None
+    train_sents = None
+    if pretrained_word2vec:
+        wordModel = KeyedVectors.load_word2vec_format('./google_300_model.bin', binary=True)
+        train_sents = encode_reviews_2(train['review'], tokenizer)
+    else:
+        wordModel, train_sents = train_and_save_word2vec(train['review'], num_features, tokenizer)
+    
+    X = vector_for_sentences(train_sents, num_features, wordModel)    
+    y = train['sentiment']
+    model.fit(X, y)
+
+    test_sents = encode_reviews_2(test['review'], tokenizer)
+    X = vector_for_sentences(test_sents, num_features, wordModel)
+    pred = model.predict(X)
+
+    return pred
+
+if __name__ == '__main__':
+    data = data_set
+    train = read_data(data['train'])
+    test = read_data(data['test'])
+    num_features = 300
+    
+    use_forest = False
+
+    pred = None
+    if use_forest:
+        forest = RandomForestClassifier(n_estimators=200)
+        pred = word2vec_forest(train, test, num_features, forest)
+    else:
+        batch_size = 32
+        num_conv = 3
+        kernel_size = 3
+        num_dense = 2
+        num_units = 256
+        num_words = 1
+        num_epochs = 1
+        model = build_mode(num_words, num_features, num_conv, kernel_size, num_dense, num_units)
+        pred = word2vec_cnn(train, test, num_features, model)
+        pred = np.squeeze(pred)
 
     output = pd.DataFrame(data={"id":test["id"], "sentiment":pred})
-    # output['sentiment'] = output['sentiment'] > 0.5
-    # output.sentiment = output.sentiment.astype('int')
+
+    if not use_forest:
+        output['sentiment'] = output['sentiment'] > 0.5
+        output.sentiment = output.sentiment.astype('int')
+    
     output.to_csv( "Bag_of_Words_model.csv", index=False, quoting=3)
