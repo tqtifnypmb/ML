@@ -8,6 +8,7 @@ from gensim.models import word2vec, KeyedVectors
 from sklearn import model_selection
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.neural_network import MLPClassifier
 from tensorflow import keras
 from bs4 import BeautifulSoup
 
@@ -64,7 +65,7 @@ def review_to_words(raw_review, remove_stop_words = False):
         return words
 
 def review_to_sentence(raw_review, tokenizer, remove_stop_words = False):
-    raw_review = raw_review.decode('utf-8')
+    # raw_review = raw_review.decode('utf-8')
     raw_sentences = tokenizer.tokenize(raw_review.strip())
     sentence = []
     for raw_sentence in raw_sentences:
@@ -155,7 +156,7 @@ def word2vec_forest(train, test, num_features, forest, pretrained_word2vec=True)
     
     X = vector_for_sentences_forest(train_sents, num_features, wordModel)    
     y = train['sentiment']
-    forest = forest.fit(X, y)
+    forest.fit(X, y)
 
     test_sents = encode_reviews_2(test['review'], tokenizer)
     X = vector_for_sentences_forest(test_sents, num_features, wordModel)
@@ -184,18 +185,19 @@ def word2vec_cnn(train, test, num_features, model, pretrained_word2vec=True):
 
     return pred
 
-if __name__ == '__main__':
+if __name__ == '__main__':    
     data = data_set
     train = read_data(data['train'])
     test = read_data(data['test'])
     num_features = 300
     
-    use_forest = False
+    use_forest = True
 
     pred = None
     if use_forest:
-        forest = RandomForestClassifier(n_estimators=200)
-        pred = word2vec_forest(train, test, num_features, forest)
+        mlp = MLPClassifier(hidden_layer_sizes=(300, 300, 300))
+        # forest = RandomForestClassifier(n_estimators=200)
+        pred = word2vec_forest(train, test, num_features, mlp, pretrained_word2vec=False)
     else:
         batch_size = 32
         num_conv = 3
