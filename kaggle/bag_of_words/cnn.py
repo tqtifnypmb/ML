@@ -8,6 +8,7 @@ from StringIO import StringIO
 from tensorflow import keras
 from bs4 import BeautifulSoup
 from tensorflow.python.lib.io import file_io
+from sklearn import model_selection
 
 # char-level CNN
 def build_mode(num_words, vocab_size, kernel_sizes, dense_shape, output_filters):
@@ -37,7 +38,7 @@ def build_mode(num_words, vocab_size, kernel_sizes, dense_shape, output_filters)
 
     pool = keras.layers.MaxPool1D(pool_size=3, padding='valid')
     model.add(pool)
-    
+
     # flatten
     model.add(keras.layers.Flatten())
 
@@ -62,7 +63,7 @@ def build_mode(num_words, vocab_size, kernel_sizes, dense_shape, output_filters)
     model.compile(loss='categorical_crossentropy', 
                   optimizer='adam',
                   metrics=['accuracy'])
-    
+    model.summary()
     return model
 
 def review_to_words(raw_review, remove_stop_words):
@@ -140,17 +141,18 @@ def main(train_file,
     X = preprocess_reviews(train['review'], max_len, False, char_to_idx)
     y = keras.utils.to_categorical(train['sentiment'])
     
+    train_X, valid_X, train_y, valid_y = model_selection.train_test_split(X, y, test_size=0.3)
+    
     num_words = len(X[0])
     vocab_size = len(char_to_idx)
     kernel_sizes = [7, 7, 3, 3, 3, 3]
-    dense_shape = [1024, 1024]
+    dense_shape = [512, 512]
     cnn = build_mode(num_words, vocab_size, kernel_sizes, dense_shape, output_filters)
-    cnn.fit(X, y, batch_size=batch_size, epochs=epoch, shuffle=True)
+    cnn.fit(train_X, train_y, validation_data=(valid_X, valid_y), batch_size=batch_size, epochs=epoch, shuffle=True)
 
     test_X = preprocess_reviews(test['review'], max_len, False, char_to_idx)
     pred = cnn.predict(test_X)
     pred = np.squeeze(pred)
-    print(pred)
     pred = np.argmax(pred, axis=1)
     
     output = pd.DataFrame(data={"id":test["id"], "sentiment":pred})
