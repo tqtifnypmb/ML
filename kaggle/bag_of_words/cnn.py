@@ -20,24 +20,48 @@ def build_mode(num_words, vocab_size, kernel_sizes, dense_shape, output_filters)
     embed = keras.layers.Embedding(vocab_size, vocab_size, input_length=num_words)
     model.add(embed)
 
-    num_conv = len(kernel_sizes)
-    for i in range(num_conv):
-        # convoluntion
-        kernel_size = kernel_sizes[i]
-        conv = keras.layers.Conv1D(output_filters, 
-                                   kernel_size, 
-                                   activation='relu', 
-                                   padding='valid',
-                                   kernel_initializer=initializer)
+    # conv1
+    conv1 = keras.layers.Conv1D(output_filters[0], 
+                                kernel_sizes[0], 
+                                activation='relu', 
+                                padding='same',
+                                kernel_initializer=initializer)
+    model.add(conv1)
+
+    # batch norm
+    model.add(keras.layers.BatchNormalization())
+
+    # pool
+    pool1 = keras.layers.MaxPool1D(pool_size=3, strides=2)
+    model.add(pool1)
+
+    # conv2
+    conv2 = keras.layers.Conv1D(output_filters[1], 
+                                kernel_sizes[1], 
+                                activation='relu', 
+                                padding='same',
+                                kernel_initializer=initializer)
+    model.add(conv2)
+
+    # batch norm
+    model.add(keras.layers.BatchNormalization())
+
+    # pool
+    pool2 = keras.layers.MaxPool1D(pool_size=3, strides=2)
+    model.add(pool2)
+
+    for i in range(len(kernel_sizes) - 2):
+        # conv
+        conv = keras.layers.Conv1D(output_filters[i + 2], 
+                                    kernel_sizes[i + 2], 
+                                    activation='relu', 
+                                    padding='valid',
+                                    kernel_initializer=initializer)
         model.add(conv)
 
-        # dense
-        if i < 2:
-            pool = keras.layers.MaxPool1D(pool_size=3, padding='valid')
-            model.add(pool)
-
-    pool = keras.layers.MaxPool1D(pool_size=3, padding='valid')
-    model.add(pool)
+    # pool
+    pool3 = keras.layers.MaxPool1D(pool_size=3, strides=2)
+    model.add(pool3)
 
     # flatten
     model.add(keras.layers.Flatten())
@@ -125,8 +149,8 @@ def main(train_file,
          nltk_dir,
          max_len,
          batch_size,
-         epoch,
-         output_filters):
+         epoch):
+    nltk.download('stopwords')
     # nltk.download('stopwords', download_dir=nltk_dir)
     # nltk.data.path.append(nltk_dir)
 
@@ -145,7 +169,8 @@ def main(train_file,
     
     num_words = len(X[0])
     vocab_size = len(char_to_idx)
-    kernel_sizes = [7, 7, 3, 3, 3, 3]
+    kernel_sizes = [11, 7, 5, 3, 3, 3]
+    output_filters = [8, 8, 16, 16, 16, 16]
     dense_shape = [512, 512]
     cnn = build_mode(num_words, vocab_size, kernel_sizes, dense_shape, output_filters)
     cnn.fit(train_X, train_y, validation_data=(valid_X, valid_y), batch_size=batch_size, epochs=epoch, shuffle=True)

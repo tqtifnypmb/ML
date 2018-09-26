@@ -25,12 +25,6 @@ def parse_params(args_parser):
     )
 
     args_parser.add_argument(
-        '--output-filters',
-        type=int,
-        required=True
-    )
-
-    args_parser.add_argument(
         '--test-file',
         required=True
     )
@@ -70,5 +64,4 @@ if __name__ == '__main__':
              paras.job_dir,
              paras.max_len,
              paras.batch_size,
-             paras.num_epoches,
-             paras.output_filters)
+             paras.num_epoches)
