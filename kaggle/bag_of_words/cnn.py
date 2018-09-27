@@ -11,82 +11,47 @@ from tensorflow.python.lib.io import file_io
 from sklearn import model_selection
 
 # char-level CNN
-def build_mode(num_words, vocab_size, kernel_sizes, dense_shape, output_filters):
+def build_mode(num_words, vocab_size):
     model = keras.Sequential()
-
-    initializer = keras.initializers.RandomNormal(mean=0.0, stddev=0.05, seed=None)
 
     # embed
     embed = keras.layers.Embedding(vocab_size, vocab_size, input_length=num_words)
     model.add(embed)
 
-    # conv1
-    conv1 = keras.layers.Conv1D(output_filters[0], 
-                                kernel_sizes[0], 
-                                activation='relu', 
-                                padding='same',
-                                kernel_initializer=initializer)
-    model.add(conv1)
+    kernels = [11, 7, 5, 3, 3, 3]
+    filters = [8, 16, 32, 32, 32, 32]
+    has_norm = [True, True, False, False, False, False]
+    has_pool = [True, True, False, False, False, False]
+    dense_units = [1024, 1024]
 
-    # batch norm
-    model.add(keras.layers.BatchNormalization())
-
-    # pool
-    pool1 = keras.layers.MaxPool1D(pool_size=3, strides=2)
-    model.add(pool1)
-
-    # conv2
-    conv2 = keras.layers.Conv1D(output_filters[1], 
-                                kernel_sizes[1], 
-                                activation='relu', 
-                                padding='same',
-                                kernel_initializer=initializer)
-    model.add(conv2)
-
-    # batch norm
-    model.add(keras.layers.BatchNormalization())
-
-    # pool
-    pool2 = keras.layers.MaxPool1D(pool_size=3, strides=2)
-    model.add(pool2)
-
-    for i in range(len(kernel_sizes) - 2):
-        # conv
-        conv = keras.layers.Conv1D(output_filters[i + 2], 
-                                    kernel_sizes[i + 2], 
-                                    activation='relu', 
-                                    padding='valid',
-                                    kernel_initializer=initializer)
+    for i in range(len(kernels)):
+        conv = keras.layers.Conv1D(filters[i], kernels[i], activation='relu', padding='same')
         model.add(conv)
 
-    # pool
-    pool3 = keras.layers.MaxPool1D(pool_size=3, strides=2)
-    model.add(pool3)
+        if has_norm[i]:
+            norm = keras.layers.BatchNormalization()
+            model.add(norm)
+        
+        if has_pool[i]:
+            pool = keras.layers.MaxPool1D(pool_size=3, strides=2, padding='valid')
+            model.add(pool)
 
-    # flatten
     model.add(keras.layers.Flatten())
 
-    # dropout
-    dropout = keras.layers.Dropout(0.5)
-    model.add(dropout)
-
-    num_dense = len(dense_shape)
-    for i in range(num_dense):
-        # dense layers
-        dense = keras.layers.Dense(dense_shape[i], activation='relu')
+    for unit in dense_units:
+        dense = keras.layers.Dense(unit, 'relu')
         model.add(dense)
 
-        # dropout
         dropout = keras.layers.Dropout(0.5)
         model.add(dropout)
 
-    # output
-    output = keras.layers.Dense(2, activation='softmax')
+    output = keras.layers.Dense(2, activation='sigmoid')
     model.add(output)
 
-    model.compile(loss='categorical_crossentropy', 
-                  optimizer='adam',
+    model.compile(optimizer='adam',
+                  loss=keras.losses.categorical_crossentropy,
                   metrics=['accuracy'])
+
     model.summary()
     return model
 
@@ -150,7 +115,7 @@ def main(train_file,
          max_len,
          batch_size,
          epoch):
-    nltk.download('stopwords')
+    # nltk.download('stopwords')
     # nltk.download('stopwords', download_dir=nltk_dir)
     # nltk.data.path.append(nltk_dir)
 
@@ -165,14 +130,11 @@ def main(train_file,
     X = preprocess_reviews(train['review'], max_len, False, char_to_idx)
     y = keras.utils.to_categorical(train['sentiment'])
     
-    train_X, valid_X, train_y, valid_y = model_selection.train_test_split(X, y, test_size=0.3)
+    train_X, valid_X, train_y, valid_y = model_selection.train_test_split(X, y, test_size=0.2)
     
     num_words = len(X[0])
     vocab_size = len(char_to_idx)
-    kernel_sizes = [11, 7, 5, 3, 3, 3]
-    output_filters = [8, 8, 16, 16, 16, 16]
-    dense_shape = [512, 512]
-    cnn = build_mode(num_words, vocab_size, kernel_sizes, dense_shape, output_filters)
+    cnn = build_mode(num_words, vocab_size)
     cnn.fit(train_X, train_y, validation_data=(valid_X, valid_y), batch_size=batch_size, epochs=epoch, shuffle=True)
 
     test_X = preprocess_reviews(test['review'], max_len, False, char_to_idx)
