@@ -1,4 +1,5 @@
-import cnn
+import word_cnn
+import char_cnn
 import argparse
 import os
 
@@ -41,6 +42,12 @@ def parse_params(args_parser):
         required=True
     )
 
+    args_parser.add_argument(
+        '--word-level',
+        type=int,
+        required=True
+    )
+
     return args_parser.parse_args()
 
 data_set = {
@@ -58,10 +65,18 @@ if __name__ == '__main__':
     paras = parse_params(args_parser)
 
     output = os.path.join(paras.job_dir, paras.output_file)
-    cnn.main(paras.train_file,
-             paras.test_file,
-             output,
-             paras.job_dir,
-             paras.max_len,
-             paras.batch_size,
-             paras.num_epoches)
+
+    if paras.word_level > 0:
+        word_cnn.main(paras.train_file,
+                      paras.test_file,
+                      output,
+                      paras.max_len,
+                      paras.batch_size,
+                      paras.num_epoches)
+    else:
+        char_cnn.main(paras.train_file,
+                      paras.test_file,
+                      output,
+                      paras.max_len,
+                      paras.batch_size,
+                      paras.num_epoches)
