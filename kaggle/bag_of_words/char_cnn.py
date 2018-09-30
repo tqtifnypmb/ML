@@ -29,6 +29,9 @@ def main(train_file,
          epoch):
 
     char_to_idx = char_idx_map()
+    vocab_size = len(char_to_idx)
+
+    cnn = char_level_cnn(num_chars, vocab_size)
 
     train_input = StringIO(file_io.read_file_to_string(train_file))
     train = read_data(train_input)
@@ -36,13 +39,14 @@ def main(train_file,
     test_input = StringIO(file_io.read_file_to_string(test_file))
     test = read_data(test_input)
 
-    X = encode_data_by_char(train['review'], num_chars, char_to_idx, False)
+    X = encode_data_by_char(train['review'], num_chars, char_to_idx, False, one_hot=True)
+    X = np.reshape(X, [-1, num_chars, 1, vocab_size])
     y = keras.utils.to_categorical(train['sentiment'])
     
-    cnn = char_level_cnn(num_chars, len(char_to_idx))
     cnn.fit(X, y, batch_size=batch_size, epochs=epoch, shuffle=True)
     
-    test_X = encode_data_by_char(test['review'], num_chars, char_to_idx, False)
+    test_X = encode_data_by_char(test['review'], num_chars, char_to_idx, False, one_hot=True)
+    test_X = np.reshape(test_X, [-1, num_chars, 1, vocab_size])
 
     print('========== do prediction ===============')
 

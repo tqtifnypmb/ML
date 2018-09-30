@@ -143,18 +143,37 @@ def encode_data_by_word(raw_reviews, num_words, num_features, wordModel, skip_st
 
     return X
 
-def encode_data_by_char(raw_reviews, num_chars, char_to_idx, skip_stop_words):
+def one_hot_encode(char, vocab_size):
+    x = np.zeros([vocab_size])
+    x[char] = 1
+    return x
+
+def encode_data_by_char(raw_reviews, num_chars, char_to_idx, skip_stop_words, one_hot = False):
     # words_list = reviews_to_words(raw_reviews, skip_stop_words)
 
+    vocab_size = len(char_to_idx)
     chars_list = reviews_to_chars(raw_reviews, char_to_idx, num_chars) #words_list_to_chars(words_list, char_to_idx, num_chars)
 
-    X = np.zeros([raw_reviews.size, num_chars])
+    if one_hot:
+        X = np.zeros([raw_reviews.size, num_chars, vocab_size])
 
-    for i in range(len(chars_list)):
-        chars = chars_list[i]
+        for i in range(len(chars_list)):
+            chars = chars_list[i]
 
-        for j in range(len(chars)):
-            char = chars[j]
-            X[i][j] = char
+            for j in range(len(chars)):
+                char = chars[j]
+                oh = one_hot_encode(char, vocab_size)
+                X[i][j] = oh
 
-    return X
+        return X
+    else:
+        X = np.zeros([raw_reviews.size, num_chars])
+
+        for i in range(len(chars_list)):
+            chars = chars_list[i]
+
+            for j in range(len(chars)):
+                char = chars[j]
+                X[i][j] = char
+
+        return X
