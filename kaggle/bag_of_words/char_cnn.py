@@ -10,7 +10,7 @@ from tensorflow.python.lib.io import file_io
 from sklearn import model_selection
 
 def char_idx_map():
-    vocab = '0abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
+    vocab = ' abcdefghijklmnopqrstuvwxyz0123456789,./?\'(){}[]<>=-+_~:'
     char_to_idx = {ch : idx for idx, ch in enumerate(vocab)}
     return char_to_idx
 
