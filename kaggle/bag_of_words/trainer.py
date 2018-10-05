@@ -1,5 +1,3 @@
-import word_cnn
-import char_cnn
 import argparse
 import os
 
@@ -67,6 +65,7 @@ if __name__ == '__main__':
     output = os.path.join(paras.job_dir, paras.output_file)
 
     if paras.word_level > 0:
+        import word_cnn
         word_cnn.main(paras.train_file,
                       paras.test_file,
                       output,
@@ -74,6 +73,7 @@ if __name__ == '__main__':
                       paras.batch_size,
                       paras.num_epoches)
     else:
+        import char_cnn
         char_cnn.main(paras.train_file,
                       paras.test_file,
                       output,
