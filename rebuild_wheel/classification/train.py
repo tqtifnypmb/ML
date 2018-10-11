@@ -1,6 +1,6 @@
 import numpy as np
 
-from models import LogisticsRegression, GaussianNaiveBayesian
+from models import LogisticsRegression, GaussianNaiveBayesian, MultinormalNaiveBayesian
 from sklearn import datasets
 from sklearn import model_selection
 from sklearn import linear_model
@@ -19,6 +19,11 @@ if __name__ == '__main__':
     gausianNB = GaussianNaiveBayesian()
     gausianNB.fit(train_x, train_y)
     pred_y = gausianNB.predict(test_x)
-    print(pred_y)
+    acc = metrics.mean_squared_error(test_y, pred_y)
+    print(acc)
+
+    mulNB = MultinormalNaiveBayesian()
+    mulNB.fit(train_x, train_y)
+    pred_y = mulNB.predict(test_x)  
     acc = metrics.mean_squared_error(test_y, pred_y)
     print(acc)

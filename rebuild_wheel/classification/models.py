@@ -96,7 +96,57 @@ class GaussianNaiveBayesian:
 
         y = np.argmax(likelihood, axis=1)
         return y
-        
 
 class MultinormalNaiveBayesian:
-    pass
+    def __init__(self, fit_prior=True):
+        self.fit_prior = fit_prior
+
+    def fit(self, x, y):
+        if x.shape[0] != y.shape[0]:
+            raise ValueError('incompatible dimensions')
+
+        klass, inverse, counts = np.unique(y, return_inverse=True, return_counts=True)
+        num_klass = len(klass)
+        num_features = x.shape[1]
+
+        feature_sums = np.zeros([num_klass, num_features])
+
+        # sum of individual feature in each class
+        for row_idx in range(len(inverse)):
+            index = inverse[row_idx]
+            sample = x[row_idx]
+            feature_sums[index] += sample
+
+        # prob of features: P(X|Y)
+        self.features_prob = np.zeros_like(feature_sums)
+        for klass_idx in range(num_klass):
+            fs = feature_sums[klass_idx]
+            sum = np.sum(fs)
+            self.features_prob[klass_idx] = np.log(fs / sum)
+
+        # prob of class: P(Y)
+        if self.fit_prior:
+            total = np.sum(counts)
+            self.class_prob = np.divide(counts, total, dtype='float')
+
+    def predict(self, x):
+        if x.shape[1] != self.features_prob.shape[1]:
+            raise ValueError('incompatible dimensions')
+
+        num_kalss = self.features_prob.shape[0]
+        likelihood = np.zeros([x.shape[0], num_kalss])
+
+        for row_idx in range(x.shape[0]):
+            row = x[row_idx]
+        
+            for klass_idx in range(num_kalss):
+                klass_features_prob = self.features_prob[klass_idx]
+                prob = np.dot(klass_features_prob, row)
+                
+                if self.fit_prior:
+                    prob += np.log(self.class_prob[klass_idx])
+
+                likelihood[row_idx][klass_idx] = prob
+        
+        y = np.argmax(likelihood, axis=1)
+        return y
