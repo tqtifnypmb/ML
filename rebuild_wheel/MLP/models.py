@@ -1,8 +1,8 @@
 import numpy as np
 
 class _Unit:
-    def __init__(self, num_units, lr, activation = 'relu'):
-        self.weights = np.random.normal(size=(1, num_units)) 
+    def __init__(self, fan_in, fan_out, lr, activation = 'relu'):
+        self.weights = np.random.normal(size=(1, fan_in)) 
         self.bias = 0
         self.lr = lr
 
@@ -23,7 +23,7 @@ class _Unit:
         if not derivative:
             return np.exp(x) / (1 + np.exp(x))
         else:
-            return np.exp(x) / ((1 +  np.exp(x)) ** 2)
+            return np.exp(x) / ((1 + np.exp(x)) ** 2)
 
     def forward(self, x):
         z = np.dot(self.weights, x)[0]
@@ -34,8 +34,9 @@ class _Unit:
 
     def backward(self, x):
         d = self.forward_input * self.derivative_activation
-        self.weights = self.weights - d * self.lr
-        return x * d
+        derivate = d * x
+        self.weights = self.weights - derivate * self.lr
+        return derivate
 
 class MLP:
     def __init__(self, input_shape, hidden_shape, lr = 1e-2, activation='relu', loss='mse'):
@@ -70,7 +71,7 @@ class MLP:
         pass
 
     def _mean_squared_error(self, logit, label):
-        # e = (logit - label) ** 2
+        # e = 1/ 2 * (logit - label) ** 2
         # return np.average(e)
         return logit - label
 
