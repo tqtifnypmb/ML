@@ -2,7 +2,8 @@ import numpy as np
 
 class _Unit:
     def __init__(self, fan_in, fan_out, lr, activation = 'relu'):
-        self.weights = np.random.normal(size=(1, fan_in)) 
+        var = (fan_in + fan_out) / 2
+        self.weights = np.random.normal(loc = 0, scale = np.sqrt(var), size = (1, fan_in)) 
         self.bias = 0
         self.lr = lr
 
@@ -36,6 +37,7 @@ class _Unit:
         d = self.forward_input * self.derivative_activation
         derivate = d * x
         self.weights = self.weights - derivate * self.lr
+
         return derivate
 
 class MLP:
@@ -62,7 +64,7 @@ class MLP:
 
             layers = []
             for _ in range(num_units):
-                unit = _Unit(prev_layer_size, lr, self.activation)
+                unit = _Unit(prev_layer_size, hidden_shape[layer_idx], lr, self.activation)
                 layers.append(unit)
 
             self.hidden.append(layers)
