@@ -7,9 +7,6 @@ from sklearn.preprocessing import LabelEncoder
 import datetime
 
 class UserItemMatrix:
-
-    def __init__(self):
-        pass    
     
     def build_user_info_matrix(self, file_path):
         data = pd.read_table(file_path, delimiter='|', header=None)
@@ -30,7 +27,7 @@ class UserItemMatrix:
 
             mat[user_id - 1, :] = [age, gender, occupation]
 
-        return mat
+        return mat.tocsr()
 
     def build_item_info_matrix(self, file_path):
         data = pd.read_table(file_path, delimiter='|', header=None)
@@ -49,7 +46,7 @@ class UserItemMatrix:
 
                 mat[item_id - 1, :] = [release_date_int]
 
-        return mat
+        return mat.tocsr()
 
     def build_interactions_matrix(self, rows, cols, file_path):
         data = pd.read_table(file_path, delimiter='\t', header=None)
@@ -60,7 +57,7 @@ class UserItemMatrix:
             userId, itemId, rating = row[0], row[1], row[2]
             mat[userId - 1, itemId - 1] = rating
 
-        return mat
+        return mat.tocoo()
 
 # Unit test
 
