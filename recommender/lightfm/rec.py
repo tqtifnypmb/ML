@@ -5,6 +5,7 @@ from annoy import AnnoyIndex
 
 import pandas as pd
 import numpy as np
+import time
     
 if __name__ == '__main__':
     
@@ -60,11 +61,13 @@ if __name__ == '__main__':
     _, user_repr = model.get_user_representations()
     _, item_repr = model.get_item_representations()
 
+    print("begin building annoy {0}, count: {1}".format(time.time(), user_repr.shape[0]))
     ann = AnnoyIndex(30)
     for i in xrange(user_repr.shape[0]):
         user_embedding = user_repr[i]
         ann.add_item(i, user_embedding)
     ann.build(10)
+    print('finish building annoy {}'.format(time.time()))
 
     similar_users = ann.get_nns_by_item(0, 10)
     print(similar_users)
