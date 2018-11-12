@@ -2,6 +2,9 @@ from lightfm import LightFM
 from matrix_builder import UserItemMatrix 
 
 import pickle
+import numpy as np
+import pandas as pd
+import scipy
 
 class RepresentationLearner:
 
@@ -40,3 +43,28 @@ class RepresentationLearner:
     def load(cls, path):
         with open(path, 'rb') as input:
             return pickle.load(input)
+
+    def train(self, interaction_path, user_features_path=None, item_features_path=None):
+
+        def read_fake_data(n_users, n_items, path):
+            data = pd.read_csv(path)
+
+            mat = scipy.sparse.lil_matrix((n_users, n_items), dtype=np.int32)
+
+            for _, row in data.iterrows():
+                userId, itemId, is_liked = row[0], row[1], row[2]
+                mat[userId, itemId] = is_liked
+
+            return mat
+
+        n_users = 10000
+        n_items = 10000
+        interactions = read_fake_data(n_users, n_items, interaction_path)
+        self.fit_partial(interactions)
+
+# Unit test
+
+if __name__ == "__main__":
+    repr = RepresentationLearner()
+    repr.train('interaction.csv')
+    repr.save('./model')

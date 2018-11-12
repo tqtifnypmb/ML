@@ -1,55 +1,49 @@
 import random
 import time
-import thread
 from threading import Lock
-
-UserPool = []
-UserPoolLock = Lock()
 
 class UserGenerator:
     def __init__(self, n_users):
         self.users = [x for x in xrange(n_users)]
-        self.usersLock = Lock()
+        self.users_lock = Lock()
+
+        self.user_pool = []
+        self.user_pool_lock = Lock()
 
     def run(self):
-        global UserPool
-        global UserPoolLock
-
         while True:
-            UserPoolLock.acquire()
-            self.usersLock.acquire()
+            self.user_pool_lock.acquire()
+            self.users_lock.acquire()
 
             if len(self.users) > 0:
                 n_arrive_users = random.randint(0, min(1000, len(self.users)))
                 random.shuffle(self.users)
-                UserPool += self.users[:n_arrive_users]
+                self.user_pool += self.users[:n_arrive_users]
                 self.users = self.users[n_arrive_users:]
 
-                print('generated {}'.format(len(UserPool)))
+                print('generated {}'.format(len(self.user_pool)))
 
-            self.usersLock.release()
-            UserPoolLock.release()
+            self.users_lock.release()
+            self.user_pool_lock.release()
 
-            interval = random.randint(0, 3)
+            interval = random.randint(0, 5)
             time.sleep(interval)
 
     def user_exit(self, user):
-        self.usersLock.acquire()
+        self.users_lock.acquire()
 
         self.users += user
 
         print("remain users: {}".format(len(self.users)))
         
-        self.usersLock.release()
-    
-# Unit test
+        self.users_lock.release()
 
-if __name__ == "__main__":
-    
-    ug = UserGenerator(100000)
+    def retrieve_users(self):
+        self.user_pool_lock.acquire()
 
-    thread.start_new_thread(ug.run, ())
-    
-    while True:
-        print(UserPool)
-        time.sleep(3)
+        cur_users = self.user_pool
+        self.user_pool = []
+
+        self.user_pool_lock.release()
+
+        return cur_users
