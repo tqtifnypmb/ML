@@ -1,7 +1,7 @@
 from matrix_builder import UserItemMatrix
 from repr_learner import RepresentationLearner
 from user_matcher import UserMatcher
-from user_generator import UserGenerator
+from user_pool_manager import UserPoolManager
 from threading import Lock
 
 import scipy
@@ -11,12 +11,12 @@ import thread
 import time
 import sets
 
-ug = UserGenerator(10000)
-
 PlayingUserPool = []
 PlayingUserLock = Lock()
 
-def release_user():
+manager = UserPoolManager()
+
+def release_user(manager):
     print('realease user start')
 
     global PlayingUserPool
@@ -26,7 +26,7 @@ def release_user():
 
         if len(PlayingUserPool) > 0:
             print('release: {}'.format(len(PlayingUserPool)))
-            ug.user_exit(PlayingUserPool)
+            manager.push_users(PlayingUserPool)
             PlayingUserPool = []
 
         PlayingUserLock.release()
@@ -44,7 +44,7 @@ class Recommender:
         
         while True:
 
-            cur_users = ug.retrieve_users()
+            cur_users, centroid_users = manager.pop_waiting_users()
 
             if len(cur_users) == 0:
                 print('no users')
@@ -95,8 +95,7 @@ class Recommender:
                         PlayingUserLock.release()
 
 if __name__ == "__main__":
-    
-    thread.start_new_thread(ug.run, ())
+    thread.start_new_thread(manager.fake, ())
     thread.start_new_thread(release_user, ())
 
     rec = Recommender()
