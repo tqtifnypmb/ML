@@ -12,20 +12,20 @@ class Keras_LSTM:
         self.model = keras.Sequential()
        
         # input
-        self.model.add(keras.layers.Embedding(vocab_size, vocab_size, input_length=seq_len))
+        self.model.add(keras.layers.Embedding(vocab_size, vocab_size))
         
         # lstm
-        for _ in range(num_layers):
+        for _ in xrange(num_layers):
             self.model.add(keras.layers.GRU(num_units, recurrent_dropout=0.5, return_sequences=True))
 
         # output
-        self.model.add(keras.layers.TimeDistributed(keras.layers.Dense(vocab_size)))
-        self.model.add(keras.layers.Activation('softmax'))
-        
+        self.model.add(keras.layers.Dense(vocab_size, activation='softmax'))
+
         self.model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['categorical_accuracy'])
-        
+        self.model.summary()
+
     def fit(self, x, y, batch_size):
-        self.model.fit(x, y, batch_size=batch_size,)
+        self.model.fit(x, y, batch_size=batch_size)
 
     def reset_states(self):
         self.model.reset_states()
@@ -66,18 +66,18 @@ def next_batch(sample, batch_size, seq_len, char_to_idx):
 
         yield x, y
         
-def do_prediction(output_len, idx_to_char, model, sample_generator):
-    initial_sample, _ = next(sample_generator)
-    pred = []
+def do_prediction(output_len, idx_to_char, char_to_idx, model):
+    pred = ['a']
     for _ in range(output_len):
-        idxs = model.predict(initial_sample)
+        sample = np.zeros((1, output_len))
+        for t, char in enumerate(pred):
+            sample[0, t] = char_to_idx[char]
+
+        idxs = model.predict(sample)
         idxs = np.squeeze(idxs)
-        sample = np.random.choice(len(idx_to_char), p=idxs[-1])
+        sample = np.random.choice(len(idx_to_char), p=idxs[len(pred) - 1])
         ch = idx_to_char[sample]
         pred.append(ch)
-
-        initial_sample[0][0:-1] = initial_sample[0][1:]
-        initial_sample[0][-1] = sample
 
     return "".join(pred)
 
@@ -110,8 +110,7 @@ def main(batch_size,
         # model.reset_states()
 
         if epoch % check_point == 0 and epoch != 0:
-            generator = next_batch(sample, 1, seq_len, char_to_idx)
-            pred_str = do_prediction(output_len, idx_to_char, model, generator)
+            pred_str = do_prediction(output_len, idx_to_char, char_to_idx, model)
             print("pred words: " + pred_str)
             output.write('==============\n')
             output.write('epoch: %d \n' % epoch)
@@ -119,8 +118,7 @@ def main(batch_size,
             output.write(pred_str)
             output.write("\n\n")
 
-    generator = next_batch(sample, 1, seq_len, char_to_idx)
-    pred_str = do_prediction(output_len, idx_to_char, model, generator)
+    pred_str = do_prediction(output_len, idx_to_char, char_to_idx, model)
     print("pred words: " + pred_str)
     output.write('==============\n')
     output.write(pred_str)
